@@ -1,0 +1,28 @@
+{
+  "name": "database-project",
+  "version": "1.0.0",
+  "description": "this is a database project",
+  "license": "ISC",
+  "author": "hitesh reddy k",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node backend/index.js",
+    "dev": "nodemon backend/index.js"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "fs": "^0.0.1-security",
+    "fs-extra": "^11.3.2",
+    "geoip-lite": "^1.4.10",
+    "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^7.0.10",
+    "nodemon": "^3.1.10",
+    "path": "^0.12.7",
+    "useragent": "^2.3.0",
+    "uuid": "^13.0.0"
+  }
+}
