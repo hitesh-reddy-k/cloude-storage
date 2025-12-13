@@ -1,20 +1,47 @@
 #include "wal.hpp"
+
 #include <fstream>
 #include <iostream>
+#include <vector>
+#include <string>
 
-void WAL::log(const std::string& walPath,
-              const std::string& record) {
+void WAL::log(const std::string& walFile,
+              const std::string& entry) {
 
-    std::cout << "[WAL] Appending WAL record" << std::endl;
-
-    std::ofstream out(walPath, std::ios::app);
-
+    std::ofstream out(walFile, std::ios::app);
     if (!out.is_open()) {
-        std::cout << "[ERROR] WAL open failed" << std::endl;
+        std::cout << "[WAL] Failed to open WAL file\n";
         return;
     }
 
-    out << record << "\n";
+    out << entry << "\n";
+    std::cout << "[WAL] Logged entry\n";
+}
 
-    std::cout << "[WAL] WAL write successful" << std::endl;
+std::vector<std::string>
+WAL::readAll(const std::string& walFile) {
+
+    std::ifstream in(walFile);
+    std::vector<std::string> entries;
+    std::string line;
+
+    if (!in.is_open()) {
+        std::cout << "[WAL] No WAL file found\n";
+        return entries;
+    }
+
+    while (std::getline(in, line)) {
+        entries.push_back(line);
+    }
+
+    std::cout << "[WAL] Read "
+              << entries.size()
+              << " WAL entries\n";
+
+    return entries;
+}
+
+void WAL::clear(const std::string& walFile) {
+    std::ofstream out(walFile, std::ios::trunc);
+    std::cout << "[WAL] WAL cleared\n";
 }

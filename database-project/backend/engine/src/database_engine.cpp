@@ -2,12 +2,17 @@
 #include "storage.hpp"
 #include "wal.hpp"
 #include "logger.hpp"
+#include <vector>
 
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 
 namespace fs = std::filesystem;
+
+static bool pathExists(const std::filesystem::path& p) {
+    return std::filesystem::exists(p);
+}
 
 
 using json = nlohmann::json;
@@ -54,22 +59,37 @@ void DatabaseEngine::createCollection(const std::string& userId,
                                       const std::string& dbName,
                                       const std::string& collection) {
 
-    fs::path file = basePath() + userId + "/" + dbName +
-                    "/data/" + collection + ".bin";
+    fs::path dbPath = basePath() + userId + "/" + dbName;
 
-    std::cout << "[ENGINE] Creating collection file: "
-              << file << std::endl;
-
-    std::ofstream out(file, std::ios::binary | std::ios::app);
-
-    if (!out.is_open()) {
-        std::cout << "[ERROR] Failed to create collection" << std::endl;
+    if (!pathExists(dbPath)) {
+        std::cout << "[ERROR] Database does not exist: "
+                  << dbName << std::endl;
         return;
     }
 
-    std::cout << "[ENGINE] Collection created: "
-              << collection << std::endl;
+    fs::path file = dbPath / "data" / (collection + ".bin");
+
+    if (pathExists(file)) {
+        std::cout << "[ERROR] Collection already exists: "
+                  << collection << std::endl;
+        return;
+    }
+
+    std::cout << "[ENGINE] Creating collection: "
+              << file << std::endl;
+
+    std::ofstream out(file, std::ios::binary);
+
+    if (!out.is_open()) {
+        std::cout << "[ERROR] Failed to create collection file" << std::endl;
+        return;
+    }
+
+    std::cout << "[ENGINE] Collection created successfully\n";
 }
+
+
+
 
 void DatabaseEngine::insert(const std::string& userId,
                             const std::string& dbName,
@@ -94,3 +114,116 @@ void DatabaseEngine::insert(const std::string& userId,
 
     std::cout << "[ENGINE] Insert completed successfully" << std::endl;
 }
+
+//for finding one
+
+std::vector<json> DatabaseEngine::find(
+    const std::string& userId,
+    const std::string& dbName,
+    const std::string& collection,
+    const json& filter) {
+
+    fs::path file = basePath()+userId+"/"+dbName+
+                    "/data/"+collection+".bin";
+
+    std::vector<json> all = Storage::readAll(file.string());
+    std::vector<json> matches;
+
+    for (auto& doc : all) {
+        bool ok = true;
+        for (auto& [k,v] : filter.items()) {
+            if (!doc.contains(k) || doc[k] != v) {
+                ok = false;
+                break;
+            }
+        }
+        if (ok) matches.push_back(doc);
+    }
+
+    std::cout << "[FIND] Matched " << matches.size()
+              << " documents\n";
+
+    return matches;
+}
+
+//for updating one
+
+bool DatabaseEngine::updateOne(
+    const std::string& userId,
+    const std::string& dbName,
+    const std::string& collection,
+    const json& filter,
+    const json& update) {
+
+    fs::path file = basePath()+userId+"/"+dbName+
+                    "/data/"+collection+".bin";
+
+    auto docs = Storage::readAll(file.string());
+    bool updated = false;
+
+    for (auto& doc : docs) {
+        bool match = true;
+        for (auto& [k,v] : filter.items())
+            if (doc[k] != v) match = false;
+
+        if (match) {
+            for (auto& [k,v] : update.items())
+                doc[k] = v;
+            updated = true;
+            break;
+        }
+    }
+
+    if (!updated) {
+        std::cout << "[UPDATE] No match found\n";
+        return false;
+    }
+
+    std::ofstream out(file, std::ios::binary | std::ios::trunc);
+    for (auto& d : docs)
+        out << d.dump() << "\n";
+
+    std::cout << "[UPDATE] One document updated\n";
+    return true;
+}
+
+//for deleting one
+
+bool DatabaseEngine::deleteOne(
+    const std::string& userId,
+    const std::string& dbName,
+    const std::string& collection,
+    const json& filter) {
+
+    fs::path file = basePath()+userId+"/"+dbName+
+                    "/data/"+collection+".bin";
+
+    auto docs = Storage::readAll(file.string());
+    std::vector<json> kept;
+    bool deleted = false;
+
+    for (auto& doc : docs) {
+        bool match = true;
+        for (auto& [k,v] : filter.items())
+            if (doc[k] != v) match = false;
+
+        if (!match || deleted)
+            kept.push_back(doc);
+        else
+            deleted = true;
+    }
+
+    if (!deleted) {
+        std::cout << "[DELETE] No match found\n";
+        return false;
+    }
+
+    std::ofstream out(file, std::ios::trunc);
+    for (auto& d : kept)
+        out << d.dump() << "\n";
+
+    std::cout << "[DELETE] One document removed\n";
+    return true;
+}
+
+
