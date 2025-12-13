@@ -5,7 +5,7 @@
 int main() {
     std::cout << "=== ENGINE START ===" << std::endl;
 
-    DatabaseEngine::init("data/databases/");
+    DatabaseEngine::init("../../../../data/databases/");
 
     DatabaseEngine::createDatabase("test-user-123", "users-db");
     DatabaseEngine::createCollection("test-user-123", "users-db", "users");

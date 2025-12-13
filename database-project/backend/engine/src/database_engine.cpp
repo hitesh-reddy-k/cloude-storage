@@ -11,10 +11,17 @@ namespace fs = std::filesystem;
 
 
 using json = nlohmann::json;
-static std::string DATA_ROOT = "data/databases/";
+static std::string DATA_ROOT = "../../data/databases/";
 
 void DatabaseEngine::init(const std::string& rootPath) {
     DATA_ROOT = rootPath;
+
+   if (!DATA_ROOT.empty()) {
+    char last = DATA_ROOT.back();
+    if (last != '/' && last != '\\') {
+        DATA_ROOT += "/";
+    }
+}
     std::cout << "[ENGINE] Data root initialized: "
               << DATA_ROOT << std::endl;
 }
@@ -23,10 +30,12 @@ static std::string basePath() {
     return DATA_ROOT;
 }
 
-void DatabaseEngine::createDatabase(const std::string& userId,
-                                    const std::string& dbName) {
+void DatabaseEngine::createDatabase(const std::string& userId, const std::string& dbName) {
 
     fs::path dbPath = basePath() + userId + "/" + dbName;
+
+    std::cout << "[DEBUG] Absolute DB path: "
+          << fs::absolute(dbPath) << std::endl;
 
     std::cout << "[ENGINE] Creating database at: "
               << dbPath << std::endl;
