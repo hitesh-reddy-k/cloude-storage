@@ -13,6 +13,7 @@ add_executable(db_engine
     src/wal.cpp
     src/logger.cpp
     src/transaction_manager.cpp
+    src/query_parser.cpp
 )
 
 # ✅ TELL COMPILER WHERE HEADERS ARE

@@ -5,3 +5,4 @@ C:\Users\hites\Desktop\database-project\database-project\backend\engine\src\stor
 C:\Users\hites\Desktop\database-project\database-project\backend\engine\src\wal.cpp;C:\Users\hites\Desktop\database-project\database-project\backend\engine\build\db_engine.dir\Debug\wal.obj
 C:\Users\hites\Desktop\database-project\database-project\backend\engine\src\logger.cpp;C:\Users\hites\Desktop\database-project\database-project\backend\engine\build\db_engine.dir\Debug\logger.obj
 C:\Users\hites\Desktop\database-project\database-project\backend\engine\src\transaction_manager.cpp;C:\Users\hites\Desktop\database-project\database-project\backend\engine\build\db_engine.dir\Debug\transaction_manager.obj
+C:\Users\hites\Desktop\database-project\database-project\backend\engine\src\query_parser.cpp;C:\Users\hites\Desktop\database-project\database-project\backend\engine\build\db_engine.dir\Debug\query_parser.obj

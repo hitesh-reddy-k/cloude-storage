@@ -5,6 +5,8 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include "query.hpp"
+
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
@@ -102,26 +104,18 @@ std::vector<json> DatabaseEngine::find(
     const std::string& collection,
     const json& filter) {
 
-fs::path file = basePath(userId, dbName)
-                / "data" / (collection + ".bin");
+    fs::path file = fs::path(DATA_ROOT) / userId / dbName / "data" / (collection + ".bin");
 
-
-    std::vector<json> all = Storage::readAll(file.string());
+    auto docs = Storage::readAll(file.string());
     std::vector<json> matches;
 
-    for (auto& doc : all) {
-        bool ok = true;
-        for (auto& [k,v] : filter.items()) {
-            if (!doc.contains(k) || doc[k] != v) {
-                ok = false;
-                break;
-            }
-        }
-        if (ok) matches.push_back(doc);
-    }
+    QueryNode query = parseQuery(filter);
 
-    std::cout << "[FIND] Matched " << matches.size()
-              << " documents\n";
+    for (auto& doc : docs)
+        if (evalQuery(query, doc))
+            matches.push_back(doc);
+
+    std::cout << "[FIND] Matched " << matches.size() << " documents\n";
 
     return matches;
 }
@@ -143,12 +137,13 @@ bool DatabaseEngine::updateOne(
     bool updated = false;
 
     for (auto& d : docs) {
-        if (match(d, filter)) {
-            for (auto& [k,v] : update.items())
-                d[k] = v;
-            updated = true;
-            break;
-        }
+      if (DatabaseEngine::match(d, filter)) {
+    for (auto& [k,v] : update.items())
+        d[k] = v;
+    updated = true;
+    break;
+}
+    
     }
 
     if (!updated) return false;
@@ -214,15 +209,7 @@ bool DatabaseEngine::deleteOne(
     return true;
 }
 
-
-bool DatabaseEngine::match(json doc, json filter) {
-    for (auto& [k, v] : filter.items()) {
-        if (v.is_object()) {
-            if (v.contains("$gt") && doc[k] <= v["$gt"]) return false;
-            if (v.contains("$lt") && doc[k] >= v["$lt"]) return false;
-        } else {
-            if (doc[k] != v) return false;
-        }
-    }
-    return true;
+bool DatabaseEngine::match(nlohmann::json doc, nlohmann::json filter) {
+    QueryNode query = parseQuery(filter);
+    return evalQuery(query, doc);
 }

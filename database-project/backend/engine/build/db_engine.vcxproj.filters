@@ -22,6 +22,9 @@
     <ClCompile Include="C:\Users\hites\Desktop\database-project\database-project\backend\engine\src\transaction_manager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\Users\hites\Desktop\database-project\database-project\backend\engine\src\query_parser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="C:\Users\hites\Desktop\database-project\database-project\backend\engine\CMakeLists.txt" />
