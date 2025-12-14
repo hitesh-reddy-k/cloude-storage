@@ -1,9 +1,12 @@
 #pragma once
-#include <string>
+#include <unordered_map>
 #include <vector>
+#include <string>
 
-class WAL {
+class Index {
+    std::unordered_map<std::string, std::vector<long>> map;
+
 public:
-    static void log(const std::string& file, const std::string& entry);
-    static void replay(const std::string& walFile);
+    void add(const std::string& key, long offset);
+    std::vector<long> find(const std::string& key);
 };

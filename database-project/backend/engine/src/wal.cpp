@@ -18,6 +18,16 @@ void WAL::log(const std::string& walFile,
     std::cout << "[WAL] Logged entry\n";
 }
 
+
+void WAL::replay(const std::string& walFile) {
+    std::ifstream in(walFile);
+    std::string line;
+    while (std::getline(in, line)) {
+        std::cout << "Replaying: " << line << std::endl;
+        // call database apply logic here
+    }
+}
+
 std::vector<std::string>
 WAL::readAll(const std::string& walFile) {
 

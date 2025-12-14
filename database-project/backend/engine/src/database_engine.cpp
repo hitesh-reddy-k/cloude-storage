@@ -3,6 +3,7 @@
 #include "wal.hpp"
 #include "logger.hpp"
 #include <vector>
+#include "transaction.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -21,15 +22,21 @@ static std::string DATA_ROOT = "../../data/databases/";
 void DatabaseEngine::init(const std::string& rootPath) {
     DATA_ROOT = rootPath;
 
-   if (!DATA_ROOT.empty()) {
-    char last = DATA_ROOT.back();
-    if (last != '/' && last != '\\') {
-        DATA_ROOT += "/";
+    if (!DATA_ROOT.empty()) {
+        char last = DATA_ROOT.back();
+        if (last != '/' && last != '\\') {
+            DATA_ROOT += "/";
+        }
     }
-}
+
     std::cout << "[ENGINE] Data root initialized: "
               << DATA_ROOT << std::endl;
+
+    // ✅ WAL crash recovery
+    std::cout << "[ENGINE] Replaying WAL if exists...\n";
+    WAL::replay(DATA_ROOT);
 }
+
 
 static std::string basePath() {
     return DATA_ROOT;
@@ -187,8 +194,9 @@ bool DatabaseEngine::updateOne(
     return true;
 }
 
-//for deleting one
 
+
+//for deleting one
 bool DatabaseEngine::deleteOne(
     const std::string& userId,
     const std::string& dbName,
@@ -226,4 +234,32 @@ bool DatabaseEngine::deleteOne(
     return true;
 }
 
+
+bool DatabaseEngine::match(json doc, json filter) {
+    for (auto& [k, v] : filter.items()) {
+        if (v.is_object()) {
+            if (v.contains("$gt") && doc[k] <= v["$gt"]) return false;
+            if (v.contains("$lt") && doc[k] >= v["$lt"]) return false;
+        } else {
+            if (doc[k] != v) return false;
+        }
+    }
+    return true;
+}
+
+
+Transaction tx;
+
+void begin() {
+    tx.id = "txn123";
+    WAL::log("data/db.wal", "BEGIN " + tx.id);
+}
+
+void commit() {
+    WAL::log("data/db.wal", "COMMIT " + tx.id);
+}
+
+void rollback() {
+    WAL::log("data/db.wal", "ROLLBACK " + tx.id);
+}
 

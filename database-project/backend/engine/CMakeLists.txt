@@ -11,5 +11,7 @@ add_executable(db_engine
     src/storage.cpp
     src/wal.cpp
     src/logger.cpp
+    src/server.cpp
+    src/index.cpp
 )
 

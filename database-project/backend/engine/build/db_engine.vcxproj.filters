@@ -16,6 +16,12 @@
     <ClCompile Include="C:\Users\hites\Desktop\database-project\database-project\backend\engine\src\logger.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\Users\hites\Desktop\database-project\database-project\backend\engine\src\server.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\hites\Desktop\database-project\database-project\backend\engine\src\index.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="C:\Users\hites\Desktop\database-project\database-project\backend\engine\CMakeLists.txt" />
