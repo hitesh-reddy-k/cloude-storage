@@ -1,51 +1,74 @@
 #include "server.hpp"
-
-#ifdef _WIN32   // WINDOWS ONLY
-
-#include <winsock2.h>
+#include "database_engine.hpp"
 #include <ws2tcpip.h>
+#include <thread>
 #include <iostream>
+#include <nlohmann/json.hpp>
 
 #pragma comment(lib, "Ws2_32.lib")
 
-void startServer() {
-    WSADATA wsa;
-    SOCKET serverSocket, clientSocket;
-    sockaddr_in serverAddr{};
-    char buffer[4096];
+using json = nlohmann::json;
 
-    std::cout << "[SERVER] Initializing Winsock...\n";
-    WSAStartup(MAKEWORD(2, 2), &wsa);
+void handleClient(unsigned long long clientSocket) {
+    SOCKET sock = (SOCKET)clientSocket;
 
-    serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (serverSocket == INVALID_SOCKET) {
-        std::cout << "[ERROR] Socket creation failed\n";
+    char buffer[8192];
+    int bytes = recv(sock, buffer, sizeof(buffer) - 1, 0);
+
+    if (bytes <= 0) {
+        closesocket(sock);
         return;
     }
 
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(9000);
-    serverAddr.sin_addr.s_addr = INADDR_ANY;
+    buffer[bytes] = '\0';
+    std::cout << "[SERVER] Received: " << buffer << std::endl;
 
-    bind(serverSocket, (sockaddr*)&serverAddr, sizeof(serverAddr));
-    listen(serverSocket, 5);
+    json req = json::parse(buffer, nullptr, false);
+    json res;
+
+    if (req.is_discarded()) {
+        res = {{"error","Invalid JSON"}};
+    }
+    else {
+        std::string action = req["action"];
+
+        if (action == "insert") {
+            DatabaseEngine::insert(
+                "system",
+                req["dbName"],
+                req["collection"],
+                req["data"]
+            );
+            res = {{"status","inserted"}};
+        }
+        else {
+            res = {{"error","Unknown action"}};
+        }
+    }
+
+    std::string out = res.dump();
+    send(sock, out.c_str(), (int)out.size(), 0);
+    closesocket(sock);
+}
+
+void startServer() {
+    WSADATA wsa;
+    WSAStartup(MAKEWORD(2, 2), &wsa);
+
+    SOCKET server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(9000);
+    addr.sin_addr.s_addr = INADDR_ANY;
+
+    bind(server, (sockaddr*)&addr, sizeof(addr));
+    listen(server, SOMAXCONN);
 
     std::cout << "[SERVER] Listening on port 9000...\n";
 
-    clientSocket = accept(serverSocket, nullptr, nullptr);
-    std::cout << "[SERVER] Client connected\n";
-
-    int bytes = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
-    if (bytes > 0) {
-        buffer[bytes] = '\0';
-        std::cout << "[SERVER] Received: " << buffer << "\n";
+    while (true) {
+        SOCKET client = accept(server, nullptr, nullptr);
+        std::thread(handleClient, (unsigned long long)client).detach();
     }
-
-    closesocket(clientSocket);
-    closesocket(serverSocket);
-    WSACleanup();
 }
-
-#else
-#error This server implementation supports Windows only
-#endif

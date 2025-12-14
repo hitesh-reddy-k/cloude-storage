@@ -2,125 +2,97 @@
 #include "storage.hpp"
 #include "wal.hpp"
 #include "logger.hpp"
-#include <vector>
-#include "transaction.hpp"
-
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 
 namespace fs = std::filesystem;
-
-static bool pathExists(const std::filesystem::path& p) {
-    return std::filesystem::exists(p);
-}
-
-
 using json = nlohmann::json;
-static std::string DATA_ROOT = "../../data/databases/";
+
+static std::string DATA_ROOT;
 
 void DatabaseEngine::init(const std::string& rootPath) {
     DATA_ROOT = rootPath;
+    if (DATA_ROOT.back() != '/' && DATA_ROOT.back() != '\\')
+        DATA_ROOT += "/";
 
-    if (!DATA_ROOT.empty()) {
-        char last = DATA_ROOT.back();
-        if (last != '/' && last != '\\') {
-            DATA_ROOT += "/";
-        }
-    }
+    fs::create_directories(DATA_ROOT);
 
-    std::cout << "[ENGINE] Data root initialized: "
-              << DATA_ROOT << std::endl;
-
-    // ✅ WAL crash recovery
-    std::cout << "[ENGINE] Replaying WAL if exists...\n";
-    WAL::replay(DATA_ROOT);
+    std::cout << "[ENGINE] Data root initialized:\n  "
+              << fs::absolute(DATA_ROOT) << std::endl;
 }
 
-
-static std::string basePath() {
-    return DATA_ROOT;
+static fs::path basePath(const std::string& userId,
+                         const std::string& dbName) {
+    return fs::path(DATA_ROOT) / userId / dbName;
 }
 
-void DatabaseEngine::createDatabase(const std::string& userId, const std::string& dbName) {
+/* ---------------- DATABASE ---------------- */
 
-    fs::path dbPath = basePath() + userId + "/" + dbName;
+void DatabaseEngine::createDatabase(const std::string& userId,
+                                    const std::string& dbName) {
+    fs::path base = basePath(userId, dbName);
 
-    std::cout << "[DEBUG] Absolute DB path: "
-          << fs::absolute(dbPath) << std::endl;
+    std::cout << "[ENGINE] Creating database: "
+              << fs::absolute(base) << std::endl;
 
-    std::cout << "[ENGINE] Creating database at: "
-              << dbPath << std::endl;
+    fs::create_directories(base / "data");
+    fs::create_directories(base / "wal");
+    fs::create_directories(base / "logs");
 
-    fs::create_directories(dbPath / "data");
-    fs::create_directories(dbPath / "wal");
-    fs::create_directories(dbPath / "logs");
-
-    Logger::write((dbPath / "logs/db.log").string(),
-                  "DATABASE CREATED");
-
-    std::cout << "[ENGINE] Database created successfully" << std::endl;
+    Logger::write((base / "logs/db.log").string(), "DATABASE CREATED");
 }
+
+/* ---------------- COLLECTION ---------------- */
 
 void DatabaseEngine::createCollection(const std::string& userId,
                                       const std::string& dbName,
                                       const std::string& collection) {
+    fs::path file = basePath(userId, dbName) / "data" /
+                    (collection + ".bin");
 
-    fs::path dbPath = basePath() + userId + "/" + dbName;
-
-    if (!pathExists(dbPath)) {
-        std::cout << "[ERROR] Database does not exist: "
-                  << dbName << std::endl;
-        return;
-    }
-
-    fs::path file = dbPath / "data" / (collection + ".bin");
-
-    if (pathExists(file)) {
-        std::cout << "[ERROR] Collection already exists: "
-                  << collection << std::endl;
-        return;
-    }
-
-    std::cout << "[ENGINE] Creating collection: "
-              << file << std::endl;
+    if (fs::exists(file)) return;
 
     std::ofstream out(file, std::ios::binary);
-
-    if (!out.is_open()) {
-        std::cout << "[ERROR] Failed to create collection file" << std::endl;
-        return;
-    }
-
-    std::cout << "[ENGINE] Collection created successfully\n";
+    std::cout << "[ENGINE] Collection created: "
+              << file << std::endl;
 }
 
-
-
+/* ---------------- INSERT ---------------- */
 
 void DatabaseEngine::insert(const std::string& userId,
                             const std::string& dbName,
                             const std::string& collection,
                             const json& doc) {
 
-    fs::path base = basePath() + userId + "/" + dbName;
+    fs::path base = basePath(userId, dbName);
     fs::path dataFile = base / "data" / (collection + ".bin");
     fs::path walFile  = base / "wal/db.wal";
-    fs::path logFile  = base / "logs/db.log";
 
-    std::cout << "[ENGINE] Insert requested" << std::endl;
-    std::cout << "  User: " << userId << std::endl;
-    std::cout << "  DB  : " << dbName << std::endl;
-    
-    std::cout << "  Coll: " << collection << std::endl;
-    std::cout << "  Doc : " << doc.dump() << std::endl;
+    if (!fs::exists(base))
+        createDatabase(userId, dbName);
 
-    WAL::log(walFile.string(), doc.dump());
+    if (!fs::exists(dataFile))
+        createCollection(userId, dbName, collection);
+
+    std::cout << "[ENGINE] INSERT\n";
+    std::cout << "  DB   : " << dbName << "\n";
+    std::cout << "  Coll : " << collection << "\n";
+    std::cout << "  File : " << fs::absolute(dataFile) << std::endl;
+
+    json walEntry = {
+        {"op","INSERT"},
+        {"userId",userId},
+        {"db",dbName},
+        {"collection",collection},
+        {"data",doc}
+    };
+
+    WAL::log(walFile.string(), walEntry);
     Storage::appendDocument(dataFile.string(), doc);
-    Logger::write(logFile.string(), "INSERT " + doc.dump());
-
-    std::cout << "[ENGINE] Insert completed successfully" << std::endl;
+    std::cout << "[STORAGE] Document written successfully\n";
 }
+
 
 //for finding one
 
@@ -130,8 +102,9 @@ std::vector<json> DatabaseEngine::find(
     const std::string& collection,
     const json& filter) {
 
-    fs::path file = basePath()+userId+"/"+dbName+
-                    "/data/"+collection+".bin";
+fs::path file = basePath(userId, dbName)
+                / "data" / (collection + ".bin");
+
 
     std::vector<json> all = Storage::readAll(file.string());
     std::vector<json> matches;
@@ -154,43 +127,46 @@ std::vector<json> DatabaseEngine::find(
 }
 
 //for updating one
-
 bool DatabaseEngine::updateOne(
     const std::string& userId,
     const std::string& dbName,
     const std::string& collection,
     const json& filter,
-    const json& update) {
+    const json& update
+) {
+    fs::path base = basePath(userId, dbName);
 
-    fs::path file = basePath()+userId+"/"+dbName+
-                    "/data/"+collection+".bin";
+    fs::path file = base / "data" / (collection + ".bin");
+    fs::path wal  = base / "wal/db.wal";
 
     auto docs = Storage::readAll(file.string());
     bool updated = false;
 
-    for (auto& doc : docs) {
-        bool match = true;
-        for (auto& [k,v] : filter.items())
-            if (doc[k] != v) match = false;
-
-        if (match) {
+    for (auto& d : docs) {
+        if (match(d, filter)) {
             for (auto& [k,v] : update.items())
-                doc[k] = v;
+                d[k] = v;
             updated = true;
             break;
         }
     }
 
-    if (!updated) {
-        std::cout << "[UPDATE] No match found\n";
-        return false;
-    }
+    if (!updated) return false;
 
-    std::ofstream out(file, std::ios::binary | std::ios::trunc);
-    for (auto& d : docs)
-        out << d.dump() << "\n";
+    json walEntry = {
+        {"op","UPDATE"},
+        {"userId",userId},
+        {"db",dbName},
+        {"collection",collection},
+        {"filter",filter},
+        {"update",update}
+    };
 
-    std::cout << "[UPDATE] One document updated\n";
+    WAL::log(wal.string(), walEntry);
+
+    std::ofstream out(file, std::ios::trunc);
+    for (auto& d : docs) out << d.dump() << "\n";
+
     return true;
 }
 
@@ -201,36 +177,40 @@ bool DatabaseEngine::deleteOne(
     const std::string& userId,
     const std::string& dbName,
     const std::string& collection,
-    const json& filter) {
+    const json& filter
+) {
+    fs::path base = basePath(userId, dbName);
 
-    fs::path file = basePath()+userId+"/"+dbName+
-                    "/data/"+collection+".bin";
+    fs::path file = base / "data" / (collection + ".bin");
+    fs::path wal  = base / "wal/db.wal";
 
     auto docs = Storage::readAll(file.string());
     std::vector<json> kept;
     bool deleted = false;
 
-    for (auto& doc : docs) {
-        bool match = true;
-        for (auto& [k,v] : filter.items())
-            if (doc[k] != v) match = false;
-
-        if (!match || deleted)
-            kept.push_back(doc);
-        else
+    for (auto& d : docs) {
+        if (!deleted && match(d, filter)) {
             deleted = true;
+            continue;
+        }
+        kept.push_back(d);
     }
 
-    if (!deleted) {
-        std::cout << "[DELETE] No match found\n";
-        return false;
-    }
+    if (!deleted) return false;
+
+    json walEntry = {
+        {"op","DELETE"},
+        {"userId",userId},
+        {"db",dbName},
+        {"collection",collection},
+        {"filter",filter}
+    };
+
+    WAL::log(wal.string(), walEntry);
 
     std::ofstream out(file, std::ios::trunc);
-    for (auto& d : kept)
-        out << d.dump() << "\n";
+    for (auto& d : kept) out << d.dump() << "\n";
 
-    std::cout << "[DELETE] One document removed\n";
     return true;
 }
 
@@ -246,20 +226,3 @@ bool DatabaseEngine::match(json doc, json filter) {
     }
     return true;
 }
-
-
-Transaction tx;
-
-void begin() {
-    tx.id = "txn123";
-    WAL::log("data/db.wal", "BEGIN " + tx.id);
-}
-
-void commit() {
-    WAL::log("data/db.wal", "COMMIT " + tx.id);
-}
-
-void rollback() {
-    WAL::log("data/db.wal", "ROLLBACK " + tx.id);
-}
-

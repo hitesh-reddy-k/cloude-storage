@@ -1,8 +1,15 @@
-#include <iostream>
 #include "server.hpp"
+#include "database_engine.hpp"
+#include <iostream>
+
 
 int main() {
     std::cout << "[MAIN] Starting DB Engine...\n";
-    startServer();
-    return 0;
+    
+    DatabaseEngine::init(
+        "C:/Users/hites/Desktop/database-project/data"
+    );
+
+
+    startServer();  // socket server loop
 }

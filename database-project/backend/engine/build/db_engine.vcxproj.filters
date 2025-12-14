@@ -4,6 +4,9 @@
     <ClCompile Include="C:\Users\hites\Desktop\database-project\database-project\backend\engine\src\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\Users\hites\Desktop\database-project\database-project\backend\engine\src\server.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="C:\Users\hites\Desktop\database-project\database-project\backend\engine\src\database_engine.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -16,10 +19,7 @@
     <ClCompile Include="C:\Users\hites\Desktop\database-project\database-project\backend\engine\src\logger.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\hites\Desktop\database-project\database-project\backend\engine\src\server.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="C:\Users\hites\Desktop\database-project\database-project\backend\engine\src\index.cpp">
+    <ClCompile Include="C:\Users\hites\Desktop\database-project\database-project\backend\engine\src\transaction_manager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

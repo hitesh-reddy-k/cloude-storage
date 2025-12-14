@@ -1,6 +1,6 @@
 ^C:\USERS\HITES\DESKTOP\DATABASE-PROJECT\DATABASE-PROJECT\BACKEND\ENGINE\BUILD\CMAKEFILES\C1DD60FACA3DA227864D299B170E98FF\GENERATE.STAMP.RULE
 setlocal
-"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/hites/Desktop/database-project/database-project/backend/engine -BC:/Users/hites/Desktop/database-project/database-project/backend/engine/build --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/Users/hites/Desktop/database-project/database-project/backend/engine/build/database_engine.sln
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/hites/Desktop/database-project/database-project/backend/engine -BC:/Users/hites/Desktop/database-project/database-project/backend/engine/build --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/Users/hites/Desktop/database-project/database-project/backend/engine/build/db_engine.sln
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone

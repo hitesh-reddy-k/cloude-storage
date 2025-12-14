@@ -10,10 +10,8 @@ router.post("/register", registerUser);
 router.post("/login", loginUser);
 console.log("visited")
 router.post("/logout/:userId",logoutUser)
-router.get("/:userId/devices",getUserDeviceLogs)
 router.post("/verify-mfa/:userId",verifyMFA);
-router.post("/forgot-password",forgotPassword)
-router.post("/reset-password",resetPassword)
+
 
 
 

@@ -115,7 +115,7 @@ CMAKE_PROJECT_DESCRIPTION:STATIC=
 CMAKE_PROJECT_HOMEPAGE_URL:STATIC=
 
 //Value Computed by CMake
-CMAKE_PROJECT_NAME:STATIC=database_engine
+CMAKE_PROJECT_NAME:STATIC=db_engine
 
 //Value Computed by CMake
 CMAKE_PROJECT_SPDX_LICENSE:STATIC=
@@ -199,6 +199,15 @@ database_engine_IS_TOP_LEVEL:STATIC=ON
 
 //Value Computed by CMake
 database_engine_SOURCE_DIR:STATIC=C:/Users/hites/Desktop/database-project/database-project/backend/engine
+
+//Value Computed by CMake
+db_engine_BINARY_DIR:STATIC=C:/Users/hites/Desktop/database-project/database-project/backend/engine/build
+
+//Value Computed by CMake
+db_engine_IS_TOP_LEVEL:STATIC=ON
+
+//Value Computed by CMake
+db_engine_SOURCE_DIR:STATIC=C:/Users/hites/Desktop/database-project/database-project/backend/engine
 
 
 ########################
