@@ -30,19 +30,49 @@ void handleClient(unsigned long long clientSocket) {
         res = {{"error","Invalid JSON"}};
     }
     else {
-        std::string action = req["action"];
+        std::string action = req.value("action", "");
 
-        if (action == "insert") {
+        std::cout << "[SERVER] Action = " << action << std::endl;
+
+        // ---------------- PING ----------------
+        if (action == "ping") {
+            res = {{"status","pong"}};
+        }
+
+        // ---------------- INSERT ----------------
+        else if (action == "insert") {
             DatabaseEngine::insert(
-                "system",
+                "system",                  // userId
                 req["dbName"],
                 req["collection"],
                 req["data"]
             );
+
             res = {{"status","inserted"}};
         }
+
+        // ---------------- FIND ----------------
+        else if (action == "find") {
+            std::cout << "[SERVER] Dispatching FIND\n";
+
+            auto results = DatabaseEngine::find(
+                "system",                  // userId
+                req["dbName"],
+                req["collection"],
+                req["filter"]
+            );
+
+            res["status"] = "ok";
+            res["count"]  = results.size();
+            res["data"]   = results;
+        }
+
+        // ---------------- UNKNOWN ----------------
         else {
-            res = {{"error","Unknown action"}};
+            res = {
+                {"error","Unknown action"},
+                {"action", action}
+            };
         }
     }
 

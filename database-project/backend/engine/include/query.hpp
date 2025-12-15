@@ -4,7 +4,7 @@
 #include <vector>
 
 struct QueryNode {
-    enum class Type { AND, OR, EQ, GT, LT } type;
+    enum class Type {ALWAYS_FALSE, AND, OR, EQ, GT, LT, MATCH_ALL,INVALID  } type;
     std::string field;
     nlohmann::json value;
     std::vector<QueryNode> children;

@@ -6,7 +6,7 @@
 class Storage {
 public:
     static void appendDocument(const std::string& file,
-                               nlohmann::json doc);
+                              const nlohmann::json& doc);
 
     static std::vector<nlohmann::json>
     readAll(const std::string& file);

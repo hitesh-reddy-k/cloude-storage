@@ -1,11 +1,11 @@
 c:\users\hites\desktop\database-project\database-project\backend\engine\build\db_engine.dir\debug\vc143.pdb
+c:\users\hites\desktop\database-project\database-project\backend\engine\build\db_engine.dir\debug\query_parser.obj
 c:\users\hites\desktop\database-project\database-project\backend\engine\build\db_engine.dir\debug\transaction_manager.obj
-c:\users\hites\desktop\database-project\database-project\backend\engine\build\db_engine.dir\debug\index.obj
-c:\users\hites\desktop\database-project\database-project\backend\engine\build\db_engine.dir\debug\server.obj
 c:\users\hites\desktop\database-project\database-project\backend\engine\build\db_engine.dir\debug\logger.obj
 c:\users\hites\desktop\database-project\database-project\backend\engine\build\db_engine.dir\debug\wal.obj
 c:\users\hites\desktop\database-project\database-project\backend\engine\build\db_engine.dir\debug\storage.obj
 c:\users\hites\desktop\database-project\database-project\backend\engine\build\db_engine.dir\debug\database_engine.obj
+c:\users\hites\desktop\database-project\database-project\backend\engine\build\db_engine.dir\debug\server.obj
 c:\users\hites\desktop\database-project\database-project\backend\engine\build\db_engine.dir\debug\main.obj
 c:\users\hites\desktop\database-project\database-project\backend\engine\build\cmakefiles\generate.stamp
 c:\users\hites\desktop\database-project\database-project\backend\engine\build\debug\db_engine.exe

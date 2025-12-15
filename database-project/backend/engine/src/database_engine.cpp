@@ -107,15 +107,21 @@ std::vector<json> DatabaseEngine::find(
     fs::path file = fs::path(DATA_ROOT) / userId / dbName / "data" / (collection + ".bin");
 
     auto docs = Storage::readAll(file.string());
-    std::vector<json> matches;
+
+    // ✅ EMPTY FILTER = return all documents
+    if (filter.is_object() && filter.empty()) {
+        std::cout << "[FIND] Empty filter → returning all documents\n";
+        return docs;
+    }
 
     QueryNode query = parseQuery(filter);
+    std::vector<json> matches;
 
-    for (auto& doc : docs)
-        if (evalQuery(query, doc))
+    for (auto& doc : docs) {
+        if (evalQuery(query, doc)) {
             matches.push_back(doc);
-
-    std::cout << "[FIND] Matched " << matches.size() << " documents\n";
+        }
+    }
 
     return matches;
 }
