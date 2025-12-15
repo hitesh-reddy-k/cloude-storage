@@ -7,24 +7,22 @@
 #include <string>
 #include <nlohmann/json.hpp>
 
-void WAL::log(const std::string& file,
-              const nlohmann::json& entry) {
-
+void WAL::log(const std::string& file, const nlohmann::json& entry) {
     std::ofstream out(file, std::ios::binary | std::ios::app);
+    if (!out.is_open()) {
+        std::cerr << "[WAL] Failed to open WAL file: " << file << "\n";
+        return;
+    }
 
     std::string payload = entry.dump();
-    uint32_t size = payload.size();
-    WalOp op = WalOp::INSERT; // dynamic later
+    uint32_t size = static_cast<uint32_t>(payload.size());
+    WalOp op = WalOp::INSERT; // currently only INSERT, extendable later
 
-
-    
-
-    out.write((char*)&op, sizeof(op));
-    out.write((char*)&size, sizeof(size));
+    out.write(reinterpret_cast<char*>(&op), sizeof(op));
+    out.write(reinterpret_cast<char*>(&size), sizeof(size));
     out.write(payload.data(), size);
     out.flush();
 }
-
 
 void WAL::replay(const std::string& file) {
     std::ifstream in(file, std::ios::binary);
@@ -34,48 +32,52 @@ void WAL::replay(const std::string& file) {
         WalOp op;
         uint32_t size;
 
-        if (!in.read((char*)&op, sizeof(op))) break;
-        in.read((char*)&size, sizeof(size));
+        if (!in.read(reinterpret_cast<char*>(&op), sizeof(op))) break;
+        if (!in.read(reinterpret_cast<char*>(&size), sizeof(size))) break;
+
+        if (size == 0) continue;
 
         std::string payload(size, '\0');
-        in.read(payload.data(), size);
+        if (!in.read(payload.data(), size)) break;
 
-        auto e = nlohmann::json::parse(payload);
-
-        if (op == WalOp::INSERT)
-            DatabaseEngine::insert(
-                e["userId"], e["db"], e["collection"], e["data"]);
+        try {
+            auto e = nlohmann::json::parse(payload);
+            if (op == WalOp::INSERT) {
+                DatabaseEngine::insert(
+                    e["userId"], e["db"], e["collection"], e["data"]
+                );
+            }
+            // future: handle UPDATE / DELETE
+        } catch (const std::exception& ex) {
+            std::cerr << "[WAL] Failed to parse WAL entry: " << ex.what() << "\n";
+        }
     }
 }
 
-
-
-std::vector<std::string>
-WAL::readAll(const std::string& walFile) {
-
-    std::ifstream in(walFile);
+// Read all WAL entries as JSON objects
+std::vector<std::string> WAL::readAll(const std::string& walFile) {
+    std::ifstream in(walFile, std::ios::binary);
     std::vector<std::string> entries;
-    std::string line;
 
     if (!in.is_open()) {
-        std::cout << "[WAL] No WAL file found\n";
+        std::cout << "[WAL] No WAL file found: " << walFile << "\n";
         return entries;
     }
 
-    std::cout << "[WAL] Writing entry to: " << walFile << std::endl;
+    while (true) {
+        WalOp op;
+        uint32_t size;
+        if (!in.read(reinterpret_cast<char*>(&op), sizeof(op))) break;
+        if (!in.read(reinterpret_cast<char*>(&size), sizeof(size))) break;
 
-    while (std::getline(in, line)) {
-        entries.push_back(line);
+        if (size == 0) continue;
+
+        std::string payload(size, '\0');
+        if (!in.read(payload.data(), size)) break;
+
+        entries.push_back(payload); // keep as string
     }
 
-    std::cout << "[WAL] Read "
-              << entries.size()
-              << " WAL entries\n";
-
+    std::cout << "[WAL] Read " << entries.size() << " entries\n";
     return entries;
-}
-
-void WAL::clear(const std::string& walFile) {
-    std::ofstream out(walFile, std::ios::trunc);
-    std::cout << "[WAL] WAL cleared\n";
 }

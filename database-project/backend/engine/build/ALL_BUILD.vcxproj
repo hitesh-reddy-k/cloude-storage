@@ -178,6 +178,10 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <Project>{D4ED84FB-C185-3775-BBEC-B5DEFFBAC180}</Project>
       <Name>db_engine</Name>
     </ProjectReference>
+    <ProjectReference Include="C:\Users\hites\Desktop\database-project\database-project\backend\engine\build\db_engine_test.vcxproj">
+      <Project>{9E3686E0-BE8E-3EB6-B193-BCBD2A700129}</Project>
+      <Name>db_engine_test</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -2,11 +2,10 @@
 #include "storage.hpp"
 #include "wal.hpp"
 #include "logger.hpp"
+#include "query.hpp"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include "query.hpp"
-
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
@@ -19,68 +18,40 @@ void DatabaseEngine::init(const std::string& rootPath) {
         DATA_ROOT += "/";
 
     fs::create_directories(DATA_ROOT);
-
-    std::cout << "[ENGINE] Data root initialized:\n  "
-              << fs::absolute(DATA_ROOT) << std::endl;
+    std::cout << "[ENGINE] Data root initialized: " << fs::absolute(DATA_ROOT) << std::endl;
 }
 
-static fs::path basePath(const std::string& userId,
-                         const std::string& dbName) {
+static fs::path basePath(const std::string& userId, const std::string& dbName) {
     return fs::path(DATA_ROOT) / userId / dbName;
 }
 
 /* ---------------- DATABASE ---------------- */
-
-void DatabaseEngine::createDatabase(const std::string& userId,
-                                    const std::string& dbName) {
+void DatabaseEngine::createDatabase(const std::string& userId, const std::string& dbName) {
     fs::path base = basePath(userId, dbName);
-
-    std::cout << "[ENGINE] Creating database: "
-              << fs::absolute(base) << std::endl;
-
     fs::create_directories(base / "data");
     fs::create_directories(base / "wal");
     fs::create_directories(base / "logs");
-
     Logger::write((base / "logs/db.log").string(), "DATABASE CREATED");
 }
 
 /* ---------------- COLLECTION ---------------- */
-
-void DatabaseEngine::createCollection(const std::string& userId,
-                                      const std::string& dbName,
-                                      const std::string& collection) {
-    fs::path file = basePath(userId, dbName) / "data" /
-                    (collection + ".bin");
-
+void DatabaseEngine::createCollection(const std::string& userId, const std::string& dbName, const std::string& collection) {
+    fs::path file = basePath(userId, dbName) / "data" / (collection + ".bin");
     if (fs::exists(file)) return;
-
     std::ofstream out(file, std::ios::binary);
-    std::cout << "[ENGINE] Collection created: "
-              << file << std::endl;
+    std::cout << "[ENGINE][CREATE COLLECTION] Created \"" << file.string() << "\"\n";
 }
 
 /* ---------------- INSERT ---------------- */
-
-void DatabaseEngine::insert(const std::string& userId,
-                            const std::string& dbName,
-                            const std::string& collection,
-                            const json& doc) {
+void DatabaseEngine::insert(const std::string& userId, const std::string& dbName,
+                            const std::string& collection, const json& doc) {
 
     fs::path base = basePath(userId, dbName);
     fs::path dataFile = base / "data" / (collection + ".bin");
     fs::path walFile  = base / "wal/db.wal";
 
-    if (!fs::exists(base))
-        createDatabase(userId, dbName);
-
-    if (!fs::exists(dataFile))
-        createCollection(userId, dbName, collection);
-
-    std::cout << "[ENGINE] INSERT\n";
-    std::cout << "  DB   : " << dbName << "\n";
-    std::cout << "  Coll : " << collection << "\n";
-    std::cout << "  File : " << fs::absolute(dataFile) << std::endl;
+    if (!fs::exists(base)) createDatabase(userId, dbName);
+    if (!fs::exists(dataFile)) createCollection(userId, dbName, collection);
 
     json walEntry = {
         {"op","INSERT"},
@@ -89,67 +60,52 @@ void DatabaseEngine::insert(const std::string& userId,
         {"collection",collection},
         {"data",doc}
     };
-
     WAL::log(walFile.string(), walEntry);
+    std::cout << "[ENGINE][INSERT] Inserting doc into \"" << dataFile.string() << "\": " << doc.dump() << "\n";
     Storage::appendDocument(dataFile.string(), doc);
-    std::cout << "[STORAGE] Document written successfully\n";
 }
 
+/* ---------------- FIND ---------------- */
+std::vector<json> DatabaseEngine::find(const std::string& userId, const std::string& dbName,
+                                       const std::string& collection, const json& filter) {
 
-//for finding one
-
-std::vector<json> DatabaseEngine::find(
-    const std::string& userId,
-    const std::string& dbName,
-    const std::string& collection,
-    const json& filter) {
-
-    fs::path file = fs::path(DATA_ROOT) / userId / dbName / "data" / (collection + ".bin");
-
+    fs::path file = basePath(userId, dbName) / "data" / (collection + ".bin");
     auto docs = Storage::readAll(file.string());
 
-    // ✅ EMPTY FILTER = return all documents
-    if (filter.is_object() && filter.empty()) {
-        std::cout << "[FIND] Empty filter → returning all documents\n";
-        return docs;
-    }
+    std::cout << "[STORAGE][READ] Read " << docs.size() << " docs from " << file.string() << "\n";
+    for (auto& d : docs) std::cout << "[STORAGE][DOC] " << d.dump() << "\n";
 
-    QueryNode query = parseQuery(filter);
     std::vector<json> matches;
-
     for (auto& doc : docs) {
-        if (evalQuery(query, doc)) {
+        if (DatabaseEngine::match(doc, filter)) {  // use match() here
             matches.push_back(doc);
+            std::cout << "[ENGINE][FIND MATCH] " << doc.dump() << "\n";
         }
     }
+
+    std::cout << "[ENGINE][FIND] Docs before filtering: " << docs.size() << "\n";
+    std::cout << "[ENGINE][FIND] Found " << matches.size() << " docs matching filter\n";
 
     return matches;
 }
 
-//for updating one
-bool DatabaseEngine::updateOne(
-    const std::string& userId,
-    const std::string& dbName,
-    const std::string& collection,
-    const json& filter,
-    const json& update
-) {
-    fs::path base = basePath(userId, dbName);
+/* ---------------- UPDATE ---------------- */
+bool DatabaseEngine::updateOne(const std::string& userId, const std::string& dbName,
+                               const std::string& collection, const json& filter,
+                               const json& update) {
 
-    fs::path file = base / "data" / (collection + ".bin");
-    fs::path wal  = base / "wal/db.wal";
+    fs::path file = basePath(userId, dbName) / "data" / (collection + ".bin");
+    fs::path walFile = basePath(userId, dbName) / "wal/db.wal";
 
     auto docs = Storage::readAll(file.string());
     bool updated = false;
 
     for (auto& d : docs) {
-      if (DatabaseEngine::match(d, filter)) {
-    for (auto& [k,v] : update.items())
-        d[k] = v;
-    updated = true;
-    break;
-}
-    
+        if (match(d, filter)) {
+            for (auto& [k,v] : update.items()) d[k] = v;
+            updated = true;
+            break;
+        }
     }
 
     if (!updated) return false;
@@ -162,32 +118,26 @@ bool DatabaseEngine::updateOne(
         {"filter",filter},
         {"update",update}
     };
+    WAL::log(walFile.string(), walEntry);
 
-    WAL::log(wal.string(), walEntry);
-
-    std::ofstream out(file, std::ios::trunc);
-    for (auto& d : docs) out << d.dump() << "\n";
-
+    Storage::writeAll(file.string(), docs);
+    std::cout << "[ENGINE][UPDATE] Updated doc matching filter: " << filter.dump() << "\n";
     return true;
 }
 
+/* ---------------- DELETE ---------------- */
+bool DatabaseEngine::deleteOne(const std::string& userId, const std::string& dbName,
+                               const std::string& collection, const json& filter) {
 
-
-//for deleting one
-bool DatabaseEngine::deleteOne(
-    const std::string& userId,
-    const std::string& dbName,
-    const std::string& collection,
-    const json& filter
-) {
-    fs::path base = basePath(userId, dbName);
-
-    fs::path file = base / "data" / (collection + ".bin");
-    fs::path wal  = base / "wal/db.wal";
+    fs::path file = basePath(userId, dbName) / "data" / (collection + ".bin");
+    fs::path walFile = basePath(userId, dbName) / "wal/db.wal";
 
     auto docs = Storage::readAll(file.string());
     std::vector<json> kept;
     bool deleted = false;
+
+    std::cout << "[DELETE] Before delete, docs:\n";
+    for (auto& d : docs) std::cout << d.dump() << "\n";
 
     for (auto& d : docs) {
         if (!deleted && match(d, filter)) {
@@ -206,16 +156,20 @@ bool DatabaseEngine::deleteOne(
         {"collection",collection},
         {"filter",filter}
     };
+    WAL::log(walFile.string(), walEntry);
 
-    WAL::log(wal.string(), walEntry);
+    Storage::writeAll(file.string(), kept);
+    std::cout << "[ENGINE][DELETE] Deleted doc matching filter: " << filter.dump() << "\n";
 
-    std::ofstream out(file, std::ios::trunc);
-    for (auto& d : kept) out << d.dump() << "\n";
+    std::cout << "[DELETE] After delete, kept docs:\n";
+    for (auto& d : kept) std::cout << d.dump() << "\n";
 
     return true;
 }
 
-bool DatabaseEngine::match(nlohmann::json doc, nlohmann::json filter) {
+/* ---------------- MATCH ---------------- */
+bool DatabaseEngine::match(json doc, json filter) {
+    if (filter.is_null() || (filter.is_object() && filter.empty())) return true;
     QueryNode query = parseQuery(filter);
     return evalQuery(query, doc);
 }
