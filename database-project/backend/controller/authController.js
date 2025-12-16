@@ -118,7 +118,13 @@ async function loginUser(req, res) {
       dbName: "system",
       collection: "users",
       filter: { id: user.id },
-      update: updatedUser
+      update: {
+  $set: {
+    mfaCode,
+    mfaExpires
+  }
+}
+
     });
 
     console.log("✅ [LOGIN] MFA stored in DB", {

@@ -27,28 +27,26 @@ void handleClient(unsigned long long clientSocket) {
     json res;
 
     if (req.is_discarded()) {
-        res = {{"error","Invalid JSON"}};
+        res = { {"error", "Invalid JSON"} };
     }
     else {
         std::string action = req.value("action", "");
-
         std::cout << "[SERVER] Action = " << action << std::endl;
 
         // ---------------- PING ----------------
         if (action == "ping") {
-            res = {{"status","pong"}};
+            res = { {"status", "pong"} };
         }
 
         // ---------------- INSERT ----------------
         else if (action == "insert") {
             DatabaseEngine::insert(
-                "system",                  // userId
+                "system",
                 req["dbName"],
                 req["collection"],
                 req["data"]
             );
-
-            res = {{"status","inserted"}};
+            res = { {"status", "inserted"} };
         }
 
         // ---------------- FIND ----------------
@@ -56,7 +54,7 @@ void handleClient(unsigned long long clientSocket) {
             std::cout << "[SERVER] Dispatching FIND\n";
 
             auto results = DatabaseEngine::find(
-                "system",                  // userId
+                "system",
                 req["dbName"],
                 req["collection"],
                 req["filter"]
@@ -67,10 +65,39 @@ void handleClient(unsigned long long clientSocket) {
             res["data"]   = results;
         }
 
+        // ---------------- UPDATE ONE ----------------
+        else if (action == "updateOne") {
+            std::cout << "[SERVER] Dispatching UPDATE_ONE\n";
+
+            bool ok = DatabaseEngine::updateOne(
+                "system",
+                req["dbName"],
+                req["collection"],
+                req["filter"],
+                req["update"]
+            );
+
+            res["status"] = ok ? "updated" : "not_found";
+        }
+
+        // ---------------- DELETE ONE ----------------
+        else if (action == "deleteOne") {
+            std::cout << "[SERVER] Dispatching DELETE_ONE\n";
+
+            bool ok = DatabaseEngine::deleteOne(
+                "system",
+                req["dbName"],
+                req["collection"],
+                req["filter"]
+            );
+
+            res["status"] = ok ? "deleted" : "not_found";
+        }
+
         // ---------------- UNKNOWN ----------------
         else {
             res = {
-                {"error","Unknown action"},
+                {"error", "Unknown action"},
                 {"action", action}
             };
         }
