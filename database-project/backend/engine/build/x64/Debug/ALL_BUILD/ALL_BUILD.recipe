@@ -8,6 +8,9 @@
       <FullPath>C:\Users\hites\Desktop\database-project\database-project\backend\engine\build\Debug\db_engine.exe</FullPath>
     </ProjectOutput>
     <ProjectOutput>
+      <FullPath>C:\Users\hites\Desktop\database-project\database-project\backend\engine\build\Debug\db_engine_test.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
       <FullPath>C:\Users\hites\Desktop\database-project\database-project\backend\engine\build\x64\Debug\ALL_BUILD</FullPath>
     </ProjectOutput>
   </ProjectOutputs>

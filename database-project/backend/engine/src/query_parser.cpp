@@ -1,14 +1,11 @@
-#include <iostream>
 #include "query.hpp"
+#include <iostream>
 
-static int indent = 0;
+using json = nlohmann::json;
 
-static void printIndent() {
-    for (int i = 0; i < indent; i++)
-        std::cout << "  ";
-}
+/* ================= PARSER ================= */
 
-QueryNode parseQuery(const nlohmann::json& filter) {
+QueryNode parseQuery(const json& filter) {
     QueryNode node;
 
     // EMPTY OBJECT = MATCH ALL
@@ -22,8 +19,10 @@ QueryNode parseQuery(const nlohmann::json& filter) {
         node.type = QueryNode::Type::OR;
 
         for (const auto& f : filter["$or"]) {
-            QueryNode child = parseQuery(f);
-            node.children.push_back(child);
+            // 🚫 Skip empty clauses INSIDE $or
+            if (f.is_object() && f.empty()) continue;
+
+            node.children.push_back(parseQuery(f));
         }
 
         return node;
@@ -34,14 +33,13 @@ QueryNode parseQuery(const nlohmann::json& filter) {
         node.type = QueryNode::Type::AND;
 
         for (const auto& f : filter["$and"]) {
-            QueryNode child = parseQuery(f);
-            node.children.push_back(child);
+            node.children.push_back(parseQuery(f));
         }
 
         return node;
     }
 
-    // FIELD MATCH
+    // FIELD = VALUE
     if (!filter.is_object() || filter.size() != 1) {
         node.type = QueryNode::Type::INVALID;
         return node;
@@ -57,33 +55,44 @@ QueryNode parseQuery(const nlohmann::json& filter) {
 
 /* ================= EVALUATOR ================= */
 
-bool evalQuery(const QueryNode& q, const nlohmann::json& doc) {
-    switch (q.type) {
+static bool matchField(const QueryNode& node, const json& doc) {
+    if (!doc.contains(node.field)) return false;
+    return doc[node.field] == node.value;
+}
 
-        case QueryNode::Type::INVALID:
-            return false;
+bool evalQuery(const QueryNode& node, const json& doc) {
 
-        case QueryNode::Type::MATCH_ALL:
-            return true;
+    switch (node.type) {
 
-        case QueryNode::Type::OR:
-            for (const auto& c : q.children)
-                if (evalQuery(c, doc)) return true;
-            return false;
+    case QueryNode::Type::MATCH_ALL:
+        return true;
 
-        case QueryNode::Type::AND:
-            for (const auto& c : q.children)
-                if (!evalQuery(c, doc)) return false;
-            return true;
+    case QueryNode::Type::ALWAYS_FALSE:
+    case QueryNode::Type::INVALID:
+        return false;
 
-        case QueryNode::Type::EQ:
-            return doc.contains(q.field) && doc[q.field] == q.value;
+    case QueryNode::Type::EQ:
+        return matchField(node, doc);
 
-        case QueryNode::Type::GT:
-            return doc.contains(q.field) && doc[q.field] > q.value;
+    case QueryNode::Type::AND:
+        for (const auto& child : node.children) {
+            if (!evalQuery(child, doc)) return false;
+        }
+        return true;
 
-        case QueryNode::Type::LT:
-            return doc.contains(q.field) && doc[q.field] < q.value;
+    case QueryNode::Type::OR: {
+        bool hasValidClause = false;
+
+        for (const auto& child : node.children) {
+            if (child.isMatchAll()) continue; // 🚫 ignore empty {}
+            hasValidClause = true;
+
+            if (evalQuery(child, doc)) return true;
+        }
+
+        // If OR had only empty clauses → false
+        return hasValidClause ? false : false;
+    }
     }
 
     return false;

@@ -3,196 +3,290 @@ const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv");
 const { sendCommand } = require("../engineClient");
 const { jwtSecret, jwtExpire } = require("../config/jwtConfig");
-const nodemailer = require("nodemailer");
 const useragent = require("useragent");
 const geoip = require("geoip-lite");
 
 dotenv.config();
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
-
-/* ----------------------------------
+/* =====================================================
    REGISTER
----------------------------------- */
+===================================================== */
 async function registerUser(req, res) {
-  const { username, email, password, role, phoneNumber } = req.body;
+  try {
+    console.log("🟡 [REGISTER] Body:", req.body);
 
-  if (!username || !email || !password)
-    return res.status(400).json({ error: "Username, email, and password required" });
+    const { username, email, password, role, phoneNumber } = req.body;
+    if (!username || !email || !password) {
+      return res.status(400).json({ error: "Username, email, password required" });
+    }
 
-  const exists = await sendCommand({
-    action: "find",
-    dbName: "system",
-    collection: "users",
-    filter: { $or: [{ email }, { username }, { phoneNumber }] }
-  });
+    const exists = await sendCommand({
+      action: "find",
+      dbName: "system",
+      collection: "users",
+      filter: { $or: [{ email }, { username }, { phoneNumber }] }
+    });
 
-  if (exists.length)
-    return res.status(400).json({ error: "User already exists" });
+    if (exists.length) {
+      console.log("🔴 [REGISTER] User already exists");
+      return res.status(400).json({ error: "User already exists" });
+    }
 
-  const hashed = await bcrypt.hash(password, 10);
+    const hashed = await bcrypt.hash(password, 10);
 
-  const user = {
-    id: "usr_" + Date.now(),
-    username,
-    email,
-    phoneNumber,
-    password: hashed,
-    role: role || "user",
-    createdAt: new Date().toISOString(),
-    logs: { logins: [], logouts: [] },
-    activeDevices: [],
-    sessions: []
-  };
-
-  await sendCommand({
-    action: "insert",
-    dbName: "system",
-    collection: "users",
-    data: user
-  });
-
-  res.json({
-    message: "User registered successfully",
-    user: {
-      id: user.id,
+    const user = {
+      id: "usr_" + Date.now(),
       username,
       email,
-      role: user.role
-    }
-  });
+      phoneNumber,
+      password: hashed,
+      role: role || "user",
+      createdAt: new Date().toISOString(),
+
+      logs: { logins: [], logouts: [] },
+      activeDevices: [],
+      sessions: [],
+
+      // MFA defaults
+      mfaCode: null,
+      mfaExpires: null
+    };
+
+    await sendCommand({
+      action: "insert",
+      dbName: "system",
+      collection: "users",
+      data: user
+    });
+
+    console.log("✅ [REGISTER] User created:", user.id);
+    res.json({ message: "User registered successfully", userId: user.id });
+
+  } catch (err) {
+    console.error("🔥 [REGISTER] ERROR:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
 }
 
-/* ----------------------------------
-   LOGIN (MFA)
----------------------------------- */
+/* =====================================================
+   LOGIN → INIT MFA
+===================================================== */
 async function loginUser(req, res) {
-  const { email, username, phoneNumber, password } = req.body;
+  try {
+    console.log("🟡 [LOGIN] Body:", req.body);
 
-  const users = await sendCommand({
-    action: "find",
-    dbName: "system",
-    collection: "users",
-    filter: { $or: [{ email }, { username }, { phoneNumber }] }
-  });
+    const { email, username, phoneNumber, password } = req.body;
 
-  const user = users[0];
-  if (!user) return res.status(404).json({ error: "User not found" });
+    const orConditions = [];
+    if (email) orConditions.push({ email });
+    if (username) orConditions.push({ username });
+    if (phoneNumber) orConditions.push({ phoneNumber });
 
-  const valid = await bcrypt.compare(password, user.password);
-  if (!valid) return res.status(401).json({ error: "Invalid password" });
+    const users = await sendCommand({
+      action: "find",
+      dbName: "system",
+      collection: "users",
+      filter: { $or: orConditions }
+    });
 
-  const mfaCode = Math.floor(100000 + Math.random() * 900000).toString();
+    console.log("🟡 [LOGIN] DB response:", users);
 
-  await sendCommand({
-    action: "updateOne",
-    dbName: "system",
-    collection: "users",
-    filter: { id: user.id },
-    update: {
-      mfaCode,
-      mfaExpires: Date.now() + 5 * 60 * 1000
+    const user = users[0];
+    if (!user) {
+      console.log("🔴 [LOGIN] User not found");
+      return res.status(404).json({ error: "User not found" });
     }
-  });
 
-  await transporter.sendMail({
-    to: user.email,
-    subject: "Your MFA Code",
-    text: `Your MFA code is ${mfaCode}`
-  });
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) {
+      console.log("🔴 [LOGIN] Invalid password");
+      return res.status(401).json({ error: "Invalid password" });
+    }
 
-  res.json({ message: "MFA code sent", userId: user.id });
+    const mfaCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const mfaExpires = Date.now() + 5 * 60 * 1000;
+
+    // ⚠️ FULL DOCUMENT UPDATE (ENGINE REQUIREMENT)
+    const updatedUser = {
+      ...user,
+      mfaCode,
+      mfaExpires
+    };
+
+    await sendCommand({
+      action: "updateOne",
+      dbName: "system",
+      collection: "users",
+      filter: { id: user.id },
+      update: updatedUser
+    });
+
+    console.log("✅ [LOGIN] MFA stored in DB", {
+      userId: user.id,
+      mfaCode,
+      mfaExpires
+    });
+
+    // DEV MODE MFA
+    console.log("🔐 [DEV MFA CODE]:", mfaCode);
+
+    res.json({
+      message: "MFA code generated",
+      userId: user.id
+    });
+
+  } catch (err) {
+    console.error("🔥 [LOGIN] ERROR:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
 }
 
-/* ----------------------------------
+/* =====================================================
    VERIFY MFA
----------------------------------- */
+===================================================== */
 async function verifyMFA(req, res) {
-  const { userId } = req.params;
-  const { code } = req.body;
+  try {
+    const { userId } = req.params;
+    const { code } = req.body;
 
-  const users = await sendCommand({
-    action: "find",
-    dbName: "system",
-    collection: "users",
-    filter: { id: userId }
-  });
+    console.log("🟡 [VERIFY MFA] userId (param):", userId);
+    console.log("🟡 [VERIFY MFA] code:", code);
 
-  const user = users[0];
-  if (!user) return res.status(404).json({ error: "User not found" });
+    const users = await sendCommand({
+      action: "find",
+      dbName: "system",
+      collection: "users",
+      filter: { id: userId }
+    });
 
-  if (Date.now() > user.mfaExpires)
-    return res.status(400).json({ error: "MFA expired" });
+    console.log("🟡 [VERIFY MFA] DB response:", users);
 
-  if (user.mfaCode !== code)
-    return res.status(400).json({ error: "Invalid MFA code" });
+    const user = users[0];
+    if (!user) {
+      console.log("🔴 [VERIFY MFA] User not found");
+      return res.status(404).json({ error: "User not found" });
+    }
 
-  const agent = useragent.parse(req.headers["user-agent"]);
-  const ip = req.socket.remoteAddress;
-  const geo = geoip.lookup(ip) || {};
+    console.log("🟡 [VERIFY MFA] Stored MFA:", {
+      mfaCode: user.mfaCode,
+      mfaExpires: user.mfaExpires,
+      now: Date.now()
+    });
 
-  const sessionId = "sess_" + Date.now();
+    // 🔥 ROOT CAUSE CHECK
+    if (!user.mfaCode || !user.mfaExpires || user.mfaExpires === 0) {
+      console.error("🔴 [VERIFY MFA] MFA missing in DB");
+      return res.status(400).json({ error: "MFA not initialized" });
+    }
 
-  user.sessions.push({ sessionId, createdAt: new Date().toISOString() });
-  user.activeDevices.push(agent.toString());
-  user.logs.logins.push({ time: new Date().toISOString(), ip, geo });
+    if (Date.now() > user.mfaExpires) {
+      console.log("🔴 [VERIFY MFA] MFA expired");
+      return res.status(400).json({ error: "MFA expired" });
+    }
 
-  await sendCommand({
-    action: "updateOne",
-    dbName: "system",
-    collection: "users",
-    filter: { id: userId },
-    update: user
-  });
+    if (String(user.mfaCode) !== String(code)) {
+      console.log("🔴 [VERIFY MFA] Invalid MFA code");
+      return res.status(400).json({ error: "Invalid MFA code" });
+    }
 
-  const token = jwt.sign(
-    { id: user.id, role: user.role, sessionId },
-    jwtSecret,
-    { expiresIn: jwtExpire }
-  );
+    const agent = useragent.parse(req.headers["user-agent"]);
+    const ip = req.socket.remoteAddress;
+    const geo = geoip.lookup(ip) || {};
 
-  res.json({
-    message: "Login successful",
-    token,
-    sessionId
-  });
+    const sessionId = "sess_" + Date.now();
+
+    // ⚠️ FULL DOCUMENT UPDATE AGAIN
+    const updatedUser = {
+      ...user,
+      mfaCode: null,
+      mfaExpires: null,
+      sessions: [...user.sessions, { sessionId, createdAt: new Date().toISOString() }],
+      activeDevices: [...user.activeDevices, agent.toString()],
+      logs: {
+        ...user.logs,
+        logins: [...user.logs.logins, { time: new Date().toISOString(), ip, geo }]
+      }
+    };
+
+    await sendCommand({
+      action: "updateOne",
+      dbName: "system",
+      collection: "users",
+      filter: { id: userId },
+      update: updatedUser
+    });
+
+    const token = jwt.sign(
+      { id: user.id, role: user.role, sessionId },
+      jwtSecret,
+      { expiresIn: jwtExpire }
+    );
+
+    console.log("✅ [VERIFY MFA] Login successful:", sessionId);
+
+    res.json({
+      message: "Login successful",
+      token,
+      sessionId
+    });
+
+  } catch (err) {
+    console.error("🔥 [VERIFY MFA] ERROR:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
 }
 
-/* ----------------------------------
-   LOGOUT
----------------------------------- */
+/* =====================================================
+   LOGOUT (FULL DOCUMENT UPDATE)
+===================================================== */
 async function logoutUser(req, res) {
-  const { userId } = req.params;
-  const { deviceName } = req.body;
+  try {
+    const { userId } = req.params;
+    const { deviceName } = req.body;
 
-  const users = await sendCommand({
-    action: "find",
-    dbName: "system",
-    collection: "users",
-    filter: { id: userId }
-  });
+    console.log("🟡 [LOGOUT] userId:", userId, "device:", deviceName);
 
-  const user = users[0];
-  if (!user) return res.status(404).json({ error: "User not found" });
+    const users = await sendCommand({
+      action: "find",
+      dbName: "system",
+      collection: "users",
+      filter: { id: userId }
+    });
 
-  user.activeDevices = user.activeDevices.filter(d => d !== deviceName);
-  user.logs.logouts.push({ time: new Date().toISOString(), device: deviceName });
+    const user = users[0];
+    if (!user) {
+      console.log("🔴 [LOGOUT] User not found");
+      return res.status(404).json({ error: "User not found" });
+    }
 
-  await sendCommand({
-    action: "updateOne",
-    dbName: "system",
-    collection: "users",
-    filter: { id: userId },
-    update: user
-  });
+    const updatedUser = {
+      ...user,
+      activeDevices: (user.activeDevices || []).filter(d => d !== deviceName),
+      logs: {
+        ...user.logs,
+        logouts: [...(user.logs.logouts || []), {
+          time: new Date().toISOString(),
+          device: deviceName
+        }]
+      }
+    };
 
-  res.json({ message: "Logout successful" });
+    await sendCommand({
+      action: "updateOne",
+      dbName: "system",
+      collection: "users",
+      filter: { id: userId },
+      update: updatedUser
+    });
+
+    console.log("✅ [LOGOUT] Successful");
+
+    res.json({ message: "Logout successful" });
+
+  } catch (err) {
+    console.error("🔥 [LOGOUT] ERROR:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
 }
 
 module.exports = {
