@@ -94,6 +94,7 @@ async function loginUser(req, res) {
     const user = users[0];
     if (!user) {
       console.log("🔴 [LOGIN] User not found");
+      console.log("find the ")
       return res.status(404).json({ error: "User not found" });
     }
 
