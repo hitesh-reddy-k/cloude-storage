@@ -16,5 +16,6 @@ public:
     static std::vector<json> find(const std::string& userId, const std::string& dbName, const std::string& collection, const json& filter);
     static bool updateOne(const std::string& userId, const std::string& dbName, const std::string& collection, const json& filter, const json& update);
     static bool deleteOne(const std::string& userId, const std::string& dbName, const std::string& collection, const json& filter);
-    static bool match(json doc, json filter);
+    static bool match(const nlohmann::json& doc,
+                      const nlohmann::json& filter);
 };

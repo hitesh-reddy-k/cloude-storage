@@ -211,7 +211,8 @@ bool DatabaseEngine::deleteOne(const std::string& userId,
 }
 
 /* ---------------- MATCH ---------------- */
-bool DatabaseEngine::match(json doc, json filter) {
+bool DatabaseEngine::match(const json& doc, const json& filter)
+{
     if (filter.is_null() || filter.empty()) return true;
     QueryNode query = parseQuery(filter);
     return evalQuery(query, doc);
