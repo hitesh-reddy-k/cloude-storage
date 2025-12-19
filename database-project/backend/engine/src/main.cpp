@@ -1,6 +1,7 @@
 #include "server.hpp"
 #include "database_engine.hpp"
 #include <iostream>
+#include "lsm.hpp"
 
 
 int main() {
@@ -10,6 +11,9 @@ int main() {
         "C:/Users/hites/Desktop/database-project/data"
     );
 
+    // initialize LSM layer with same data root
+    LSM::init("C:/Users/hites/Desktop/database-project/data");
+    LSM::startBackgroundTasks();
 
     startServer();  // socket server loop
 }

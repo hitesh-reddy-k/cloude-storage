@@ -59,6 +59,12 @@ async function registerUser(req, res) {
       data: user
     });
 
+    // initialize per-user workspace in engine
+    await sendCommand({
+      action: "initUserSpace",
+      userId: user.id
+    });
+
     console.log("✅ [REGISTER] User created:", user.id);
     res.json({ message: "User registered successfully", userId: user.id });
 
@@ -196,9 +202,17 @@ async function verifyMFA(req, res) {
       return res.status(400).json({ error: "Invalid MFA code" });
     }
 
-    const agent = useragent.parse(req.headers["user-agent"]);
-    const ip = req.socket.remoteAddress;
+    const agent = useragent.parse(req.headers["user-agent"] || "unknown");
+    const ip = req.socket?.remoteAddress || "unknown";
     const geo = geoip.lookup(ip) || {};
+
+    // normalize optional fields to avoid undefined errors with older users
+    const safeLogs = user.logs && typeof user.logs === "object" ? user.logs : { logins: [], logouts: [] };
+    safeLogs.logins = Array.isArray(safeLogs.logins) ? safeLogs.logins : [];
+    safeLogs.logouts = Array.isArray(safeLogs.logouts) ? safeLogs.logouts : [];
+
+    const safeSessions = Array.isArray(user.sessions) ? user.sessions : [];
+    const safeDevices = Array.isArray(user.activeDevices) ? user.activeDevices : [];
 
     const sessionId = "sess_" + Date.now();
 
@@ -207,11 +221,11 @@ async function verifyMFA(req, res) {
       ...user,
       mfaCode: null,
       mfaExpires: null,
-      sessions: [...user.sessions, { sessionId, createdAt: new Date().toISOString() }],
-      activeDevices: [...user.activeDevices, agent.toString()],
+      sessions: [...safeSessions, { sessionId, createdAt: new Date().toISOString() }],
+      activeDevices: [...safeDevices, agent.toString()],
       logs: {
-        ...user.logs,
-        logins: [...user.logs.logins, { time: new Date().toISOString(), ip, geo }]
+        ...safeLogs,
+        logins: [...safeLogs.logins, { time: new Date().toISOString(), ip, geo }]
       }
     };
 

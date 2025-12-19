@@ -375,6 +375,7 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     <ClCompile Include="C:\Users\hites\Desktop\database-project\database-project\backend\engine\src\logger.cpp" />
     <ClCompile Include="C:\Users\hites\Desktop\database-project\database-project\backend\engine\src\transaction_manager.cpp" />
     <ClCompile Include="C:\Users\hites\Desktop\database-project\database-project\backend\engine\src\query_parser.cpp" />
+    <ClCompile Include="C:\Users\hites\Desktop\database-project\database-project\backend\engine\src\lsm.cpp" />
   </ItemGroup>
   <ItemGroup />
   <ItemGroup>

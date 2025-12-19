@@ -19,11 +19,16 @@ function sendCommand(payload) {
 
         // ✅ normalize response
         if (Array.isArray(response)) {
-          resolve(response);
+          return resolve(response);
         }
 
         if (response?.status === "ok" && Array.isArray(response.data)) {
-          resolve(response.data);
+          return resolve(response.data);
+        }
+
+        // if it's an object with status/message, return it as-is
+        if (response && typeof response === "object") {
+          return resolve(response);
         }
 
         resolve([]);

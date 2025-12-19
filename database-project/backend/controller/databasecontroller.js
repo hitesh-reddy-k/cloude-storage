@@ -1,5 +1,4 @@
 const crypto = require("crypto");
-const { readUsers, writeUsers } = require("../config/db");
 const { sendCommand } = require("../engineClient");
 
 /* ---------------------------------------------------------
@@ -27,12 +26,23 @@ async function setupDatabaseCredentials(req, res) {
     return res.status(400).json({ error: "dbUsername and dbPassword are required" });
   }
 
-  const users = await readUsers();
-  const user = users.find(u => u.id === userId);
+  const found = await sendCommand({
+    action: "find",
+    dbName: "system",
+    collection: "users",
+    filter: { id: userId }
+  });
+
+  const user = found[0];
   if (!user) return res.status(404).json({ error: "User not found" });
 
-  const db = user.databases?.find(d => d.name === dbName);
-  if (!db) return res.status(404).json({ error: "Database not found for this user" });
+  const databases = Array.isArray(user.databases) ? user.databases : [];
+  let db = databases.find(d => d.name === dbName);
+
+  if (!db) {
+    db = { name: dbName };
+    databases.push(db);
+  }
 
   const token = crypto.randomBytes(16).toString("hex");
 
@@ -44,7 +54,13 @@ async function setupDatabaseCredentials(req, res) {
 
   db.connectionURL = `rdb://${dbUsername}:${dbPassword}@localhost:9999/${dbName}?auth=${userId}`;
 
-  await writeUsers(users);
+  await sendCommand({
+    action: "updateOne",
+    dbName: "system",
+    collection: "users",
+    filter: { id: userId },
+    update: { $set: { databases } }
+  });
 
   return res.json({
     message: "Database credentials saved successfully",
@@ -58,11 +74,17 @@ async function setupDatabaseCredentials(req, res) {
 async function connectDatabase(req, res) {
   const { userId, dbName, schemaName } = req.params;
 
-  const users = await readUsers();
-  const user = users.find(u => u.id === userId);
+  const found = await sendCommand({
+    action: "find",
+    dbName: "system",
+    collection: "users",
+    filter: { id: userId }
+  });
+
+  const user = found[0];
   if (!user) return res.status(404).json({ error: "User not found" });
 
-  const db = user.databases.find(d => d.name === dbName);
+  const db = (user.databases || []).find(d => d.name === dbName);
   if (!db) return res.status(404).json({ error: "Database not found" });
 
   if (!db.credentials)
@@ -94,6 +116,9 @@ async function askDatabasePermission(req, res) {
 
   if (!userId || !dbName)
     return res.status(400).json({ error: "User ID and database name required" });
+  
+  // ensure user workspace exists, then create the database
+  await sendCommand({ action: "initUserSpace", userId });
 
   const engineRes = await sendCommand({
     action: "createDatabase",

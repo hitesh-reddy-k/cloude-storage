@@ -13,7 +13,7 @@ set(ENGINE_CORE
     src/logger.cpp
     src/transaction_manager.cpp
     src/query_parser.cpp
-    
+    src/lsm.cpp
 )
 
 # ------------------ MAIN ENGINE (SERVER) ------------------

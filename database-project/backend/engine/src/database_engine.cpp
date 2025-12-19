@@ -4,6 +4,7 @@
 #include "logger.hpp"
 #include "query.hpp"
 #include "update_ops.hpp"
+#include "lsm.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -29,9 +30,19 @@ static fs::path basePath(const std::string& userId, const std::string& dbName) {
     return fs::path(DATA_ROOT) / userId / dbName;
 }
 
+/* ---------------- USER ROOT ---------------- */
+void DatabaseEngine::ensureUserRoot(const std::string& userId) {
+    fs::path userRoot = fs::path(DATA_ROOT) / userId;
+    fs::create_directories(userRoot);
+    fs::create_directories(userRoot / "data");
+    fs::create_directories(userRoot / "wal");
+    fs::create_directories(userRoot / "logs");
+}
+
 /* ---------------- DATABASE ---------------- */
 void DatabaseEngine::createDatabase(const std::string& userId,
                                     const std::string& dbName) {
+    ensureUserRoot(userId);
     fs::path base = basePath(userId, dbName);
     fs::create_directories(base / "data");
     fs::create_directories(base / "wal");
@@ -50,31 +61,32 @@ void DatabaseEngine::createCollection(const std::string& userId,
     std::cout << "[ENGINE][CREATE COLLECTION] " << file.string() << "\n";
 }
 
+/* ---------------- LIST DATABASES ---------------- */
+std::vector<std::string> DatabaseEngine::listDatabases(const std::string& userId) {
+    std::vector<std::string> names;
+
+    fs::path userRoot = fs::path(DATA_ROOT) / userId;
+    if (!fs::exists(userRoot)) return names;
+
+    for (const auto& entry : fs::directory_iterator(userRoot)) {
+        if (entry.is_directory()) {
+            names.push_back(entry.path().filename().string());
+        }
+    }
+
+    return names;
+}
+
 /* ---------------- INSERT ---------------- */
 void DatabaseEngine::insert(const std::string& userId,
                             const std::string& dbName,
                             const std::string& collection,
                             const json& doc) {
 
-    fs::path base = basePath(userId, dbName);
-    fs::path dataFile = base / "data" / (collection + ".bin");
-    fs::path walFile  = base / "wal/db.wal";
-
-    if (!fs::exists(base)) createDatabase(userId, dbName);
-    if (!fs::exists(dataFile)) createCollection(userId, dbName, collection);
-
-    json walEntry = {
-        {"op","INSERT"},
-        {"userId",userId},
-        {"db",dbName},
-        {"collection",collection},
-        {"data",doc}
-    };
-
-    WAL::log(walFile.string(), walEntry);
-
-    std::cout << "[ENGINE][INSERT] " << doc.dump() << "\n";
-    Storage::appendDocument(dataFile.string(), doc);
+    // delegate to LSM layer (which will write WAL, memtable and flush to SST)
+    if (!fs::exists(basePath(userId, dbName))) createDatabase(userId, dbName);
+    std::cout << "[ENGINE] Using LSM::put for insert\n";
+    LSM::put(userId, dbName, collection, doc);
 }
 
 /* ---------------- FIND ---------------- */
@@ -82,10 +94,8 @@ std::vector<json> DatabaseEngine::find(const std::string& userId,
                                        const std::string& dbName,
                                        const std::string& collection,
                                        const json& filter) {
-
-    fs::path file = basePath(userId, dbName) / "data" / (collection + ".bin");
-    auto docs = Storage::readAll(file.string());
-
+    // read via LSM layer (merge memtable + SSTs)
+    auto docs = LSM::getAll(userId, dbName, collection);
     std::vector<json> matches;
     for (auto& d : docs) {
         if (match(d, filter)) {

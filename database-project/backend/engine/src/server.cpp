@@ -38,10 +38,51 @@ void handleClient(unsigned long long clientSocket) {
             res = { {"status", "pong"} };
         }
 
+        // ---------------- INIT USER SPACE ----------------
+        else if (action == "initUserSpace") {
+            std::string userId = req.value("userId", "system");
+            DatabaseEngine::ensureUserRoot(userId);
+            res = { {"status", "ok"}, {"message", "user workspace initialized"} };
+        }
+
+        // ---------------- CREATE DATABASE ----------------
+        else if (action == "createDatabase") {
+            std::string userId = req.value("userId", "system");
+            std::string dbName = req.value("dbName", "");
+
+            if (!dbName.empty()) {
+                DatabaseEngine::createDatabase(userId, dbName);
+                res = { {"status", "ok"}, {"message", "database created"} };
+            } else {
+                res = { {"error", "dbName required"} };
+            }
+        }
+
+        // ---------------- CREATE COLLECTION ----------------
+        else if (action == "createCollection") {
+            std::string userId = req.value("userId", "system");
+            std::string dbName = req.value("dbName", "");
+            std::string coll  = req.value("collection", "");
+
+            if (!dbName.empty() && !coll.empty()) {
+                DatabaseEngine::createCollection(userId, dbName, coll);
+                res = { {"status", "ok"}, {"message", "collection created"} };
+            } else {
+                res = { {"error", "dbName and collection required"} };
+            }
+        }
+
+        // ---------------- LIST DATABASES ----------------
+        else if (action == "listDatabases") {
+            std::string userId = req.value("userId", "system");
+            auto dbs = DatabaseEngine::listDatabases(userId);
+            res = dbs; // respond as array
+        }
+
         // ---------------- INSERT ----------------
         else if (action == "insert") {
             DatabaseEngine::insert(
-                "system",
+                req.value("userId", "system"),
                 req["dbName"],
                 req["collection"],
                 req["data"]
@@ -54,7 +95,7 @@ void handleClient(unsigned long long clientSocket) {
             std::cout << "[SERVER] Dispatching FIND\n";
 
             auto results = DatabaseEngine::find(
-                "system",
+                req.value("userId", "system"),
                 req["dbName"],
                 req["collection"],
                 req["filter"]
@@ -70,7 +111,7 @@ void handleClient(unsigned long long clientSocket) {
             std::cout << "[SERVER] Dispatching UPDATE_ONE\n";
 
             bool ok = DatabaseEngine::updateOne(
-                "system",
+                req.value("userId", "system"),
                 req["dbName"],
                 req["collection"],
                 req["filter"],
@@ -85,7 +126,7 @@ void handleClient(unsigned long long clientSocket) {
             std::cout << "[SERVER] Dispatching DELETE_ONE\n";
 
             bool ok = DatabaseEngine::deleteOne(
-                "system",
+                req.value("userId", "system"),
                 req["dbName"],
                 req["collection"],
                 req["filter"]
