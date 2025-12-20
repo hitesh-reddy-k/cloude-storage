@@ -83,8 +83,32 @@ void DatabaseEngine::insert(const std::string& userId,
                             const std::string& collection,
                             const json& doc) {
 
-    // delegate to LSM layer (which will write WAL, memtable and flush to SST)
+    // If this is the main system users collection, persist in the .bin storage
     if (!fs::exists(basePath(userId, dbName))) createDatabase(userId, dbName);
+
+    bool isMainUsers = (dbName == "system" && collection == "users");
+
+    if (isMainUsers) {
+        fs::path dataFile = basePath(userId, dbName) / "data" / (collection + ".bin");
+        fs::path walFile  = basePath(userId, dbName) / "wal/db.wal";
+
+        // append to storage and write WAL
+        Storage::appendDocument(dataFile.string(), doc);
+
+        json walEntry = {
+            {"op", "INSERT"},
+            {"userId", userId},
+            {"db", dbName},
+            {"collection", collection},
+            {"data", doc}
+        };
+        WAL::log(walFile.string(), walEntry);
+
+        std::cout << "[ENGINE] Inserted into .bin storage for system users\n";
+        return;
+    }
+
+    // delegate to LSM layer (which will write WAL, memtable and flush to SST)
     std::cout << "[ENGINE] Using LSM::put for insert\n";
     LSM::put(userId, dbName, collection, doc);
 }
@@ -94,10 +118,22 @@ std::vector<json> DatabaseEngine::find(const std::string& userId,
                                        const std::string& dbName,
                                        const std::string& collection,
                                        const json& filter) {
-    // read via LSM layer (merge memtable + SSTs)
-    auto docs = LSM::getAll(userId, dbName, collection);
+    bool isMainUsers = (dbName == "system" && collection == "users");
+    std::vector<json> docs;
+
+    if (isMainUsers) {
+        fs::path file = basePath(userId, dbName) / "data" / (collection + ".bin");
+        docs = Storage::readAll(file.string());
+    } else {
+        // read via LSM layer (merge memtable + SSTs)
+        docs = LSM::getAll(userId, dbName, collection);
+    }
+
     std::vector<json> matches;
     for (auto& d : docs) {
+        // skip tombstones produced by LSM deletes
+        if (d.contains("_deleted") && d["_deleted"].is_boolean() && d["_deleted"].get<bool>()) continue;
+
         if (match(d, filter)) {
             matches.push_back(d);
             std::cout << "[ENGINE][FIND MATCH] " << d.dump() << "\n";
@@ -118,67 +154,79 @@ bool DatabaseEngine::updateOne(
     const json& filter,
     const json& update
 ) {
-    fs::path base     = basePath(userId, dbName);
-    fs::path dataFile = base / "data" / (collection + ".bin");
-    fs::path walFile  = base / "wal/db.wal";
-
+    fs::path base = basePath(userId, dbName);
     if (!fs::exists(base)) createDatabase(userId, dbName);
-    if (!fs::exists(dataFile)) createCollection(userId, dbName, collection);
+    bool isMainUsers = (dbName == "system" && collection == "users");
 
-    auto docs = Storage::readAll(dataFile.string());
-    bool updated = false;
+    if (isMainUsers) {
+        fs::path dataFile = base / "data" / (collection + ".bin");
+        fs::path walFile = base / "wal/db.wal";
+
+        auto docs = Storage::readAll(dataFile.string());
+        bool updated = false;
+
+        for (auto& d : docs) {
+            if (match(d, filter)) {
+                std::cout << "[ENGINE][UPDATE][BEFORE] " << d.dump() << "\n";
+
+                bool hasOperator = false;
+                for (auto& [k, _] : update.items()) {
+                    if (!k.empty() && k[0] == '$') { hasOperator = true; break; }
+                }
+
+                json effectiveUpdate = hasOperator ? update : json{{"$set", update}};
+                if (!hasOperator) std::cout << "[ENGINE][UPDATE] Plain update → auto $set\n";
+
+                applyUpdateOps(d, effectiveUpdate);
+
+                std::cout << "[ENGINE][UPDATE][AFTER] " << d.dump() << "\n";
+                updated = true;
+                break;
+            }
+        }
+
+        if (!updated) {
+            std::cout << "[ENGINE][UPDATE] No match for filter " << filter.dump() << "\n";
+            return false;
+        }
+
+        json walEntry = {
+            {"op", "UPDATE"},
+            {"userId", userId},
+            {"db", dbName},
+            {"collection", collection},
+            {"filter", filter},
+            {"update", update}
+        };
+
+        WAL::log(walFile.string(), walEntry);
+        Storage::writeAll(dataFile.string(), docs);
+        std::cout << "[ENGINE][UPDATE] Update persisted to .bin storage\n";
+        return true;
+    }
+
+    // fallback to LSM path for regular collections
+    auto docs = LSM::getAll(userId, dbName, collection);
+    bool updated = false; json updatedDoc;
 
     for (auto& d : docs) {
         if (match(d, filter)) {
-
             std::cout << "[ENGINE][UPDATE][BEFORE] " << d.dump() << "\n";
-
-            /* 🔥 BACKWARD COMPATIBILITY FIX */
             bool hasOperator = false;
             for (auto& [k, _] : update.items()) {
-                if (!k.empty() && k[0] == '$') {
-                    hasOperator = true;
-                    break;
-                }
+                if (!k.empty() && k[0] == '$') { hasOperator = true; break; }
             }
-
-            json effectiveUpdate;
-            if (hasOperator) {
-                effectiveUpdate = update;
-                std::cout << "[ENGINE][UPDATE] Operator update detected\n";
-            } else {
-                effectiveUpdate = json{{"$set", update}};
-                std::cout << "[ENGINE][UPDATE] Plain update → auto $set\n";
-            }
-
+            json effectiveUpdate = hasOperator ? update : json{{"$set", update}};
             applyUpdateOps(d, effectiveUpdate);
-
             std::cout << "[ENGINE][UPDATE][AFTER] " << d.dump() << "\n";
-
-            updated = true;
-            break;
+            updated = true; updatedDoc = d; break;
         }
     }
 
-    if (!updated) {
-        std::cout << "[ENGINE][UPDATE] No match for filter "
-                  << filter.dump() << "\n";
-        return false;
-    }
-
-    json walEntry = {
-        {"op", "UPDATE"},
-        {"userId", userId},
-        {"db", dbName},
-        {"collection", collection},
-        {"filter", filter},
-        {"update", update}
-    };
-
-    WAL::log(walFile.string(), walEntry);
-    Storage::writeAll(dataFile.string(), docs);
-
-    std::cout << "[ENGINE][UPDATE] Update persisted successfully\n";
+    if (!updated) { std::cout << "[ENGINE][UPDATE] No match for filter " << filter.dump() << "\n"; return false; }
+    if (!updatedDoc.contains("id")) { std::cout << "[ENGINE][UPDATE] Missing id field, skipping update write\n"; return false; }
+    LSM::put(userId, dbName, collection, updatedDoc);
+    std::cout << "[ENGINE][UPDATE] Update persisted via LSM\n";
     return true;
 }
 
@@ -188,35 +236,69 @@ bool DatabaseEngine::deleteOne(const std::string& userId,
                                const std::string& collection,
                                const json& filter) {
 
-    fs::path file = basePath(userId, dbName) / "data" / (collection + ".bin");
-    fs::path walFile = basePath(userId, dbName) / "wal/db.wal";
+    fs::path base = basePath(userId, dbName);
+    if (!fs::exists(base)) createDatabase(userId, dbName);
 
-    auto docs = Storage::readAll(file.string());
-    std::vector<json> kept;
-    bool deleted = false;
+    bool isMainUsers = (dbName == "system" && collection == "users");
 
-    for (auto& d : docs) {
-        if (!deleted && match(d, filter)) {
-            deleted = true;
-            continue;
+    if (isMainUsers) {
+        fs::path file = base / "data" / (collection + ".bin");
+        fs::path walFile = base / "wal/db.wal";
+
+        auto docs = Storage::readAll(file.string());
+        std::vector<json> kept;
+        bool deleted = false;
+
+        for (auto& d : docs) {
+            if (!deleted && match(d, filter)) {
+                deleted = true;
+                continue;
+            }
+            kept.push_back(d);
         }
-        kept.push_back(d);
+
+        if (!deleted) return false;
+
+        json walEntry = {
+            {"op","DELETE"},
+            {"userId",userId},
+            {"db",dbName},
+            {"collection",collection},
+            {"filter",filter}
+        };
+
+        WAL::log(walFile.string(), walEntry);
+        Storage::writeAll(file.string(), kept);
+
+        std::cout << "[ENGINE][DELETE] Success\n";
+        return true;
     }
 
-    if (!deleted) return false;
+    // LSM-backed collection: locate matching document, then write a tombstone
+    auto docs = LSM::getAll(userId, dbName, collection);
+    bool found = false; std::string targetId;
 
-    json walEntry = {
-        {"op","DELETE"},
-        {"userId",userId},
-        {"db",dbName},
-        {"collection",collection},
-        {"filter",filter}
-    };
+    for (auto& d : docs) {
+        // skip LSM tombstones when searching
+        if (d.contains("_deleted") && d["_deleted"].is_boolean() && d["_deleted"].get<bool>()) continue;
+        if (match(d, filter)) {
+            if (d.contains("id")) {
+                targetId = d["id"].get<std::string>();
+                found = true;
+                break;
+            }
+        }
+    }
 
-    WAL::log(walFile.string(), walEntry);
-    Storage::writeAll(file.string(), kept);
+    if (!found) {
+        std::cout << "[ENGINE][DELETE] No match for filter " << filter.dump() << "\n";
+        return false;
+    }
 
-    std::cout << "[ENGINE][DELETE] Success\n";
+    // write tombstone via LSM::del (which logs a DELETE and inserts tombstone into memtable)
+    LSM::del(userId, dbName, collection, targetId);
+
+    std::cout << "[ENGINE][DELETE] Tombstone written for id=" << targetId << "\n";
     return true;
 }
 

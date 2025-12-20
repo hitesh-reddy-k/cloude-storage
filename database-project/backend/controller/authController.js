@@ -159,8 +159,14 @@ async function loginUser(req, res) {
 ===================================================== */
 async function verifyMFA(req, res) {
   try {
-    const { userId } = req.params;
+    // Normalize incoming user id (accept either param or body fallback)
+    const userId = (req.params.userId || req.body.userId || "").trim();
     const { code } = req.body;
+
+    if (!userId) {
+      console.log("🔴 [VERIFY MFA] Missing userId");
+      return res.status(400).json({ error: "userId is required" });
+    }
 
     console.log("🟡 [VERIFY MFA] userId (param):", userId);
     console.log("🟡 [VERIFY MFA] code:", code);

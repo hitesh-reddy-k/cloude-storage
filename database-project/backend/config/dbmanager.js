@@ -110,7 +110,7 @@ async function insertData(userId, dbName, schemaName, data) {
     throw new Error("Permission denied: Write access required");
 
   let rows = readSchema(db.path, schemaName);
-  data.id = Date.now(); // Auto–ID
+  data.id = String(Date.now()); // Auto–ID as string to match LSM expectations
   rows.push(data);
 
   writeSchema(db.path, schemaName, rows);

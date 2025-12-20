@@ -1,5 +1,29 @@
 const crypto = require("crypto");
+const dotenv = require("dotenv");
 const { sendCommand } = require("../engineClient");
+
+dotenv.config();
+
+const DB_HOST = process.env.DB_HOST || "localhost";
+const DB_PORT = process.env.DB_PORT || "9999";
+
+function buildConnectionURL({ username, password, dbName, userId }) {
+  return `rdb://${username}:${password}@${DB_HOST}:${DB_PORT}/${dbName}?auth=${userId}`;
+}
+
+function normalizeEngineDatabases(engineRes) {
+  if (!engineRes) return [];
+
+  if (Array.isArray(engineRes)) {
+    return engineRes.map(db => (typeof db === "string" ? { name: db } : db));
+  }
+
+  if (Array.isArray(engineRes.databases)) {
+    return engineRes.databases.map(db => (typeof db === "string" ? { name: db } : db));
+  }
+
+  return [];
+}
 
 /* ---------------------------------------------------------
    PERMISSION CHECK (ENGINE METADATA)
@@ -46,13 +70,19 @@ async function setupDatabaseCredentials(req, res) {
 
   const token = crypto.randomBytes(16).toString("hex");
 
+  const connectionURL = buildConnectionURL({
+    username: dbUsername,
+    password: dbPassword,
+    dbName,
+    userId
+  });
+
   db.credentials = {
     username: dbUsername,
     password: dbPassword,
     token
   };
-
-  db.connectionURL = `rdb://${dbUsername}:${dbPassword}@localhost:9999/${dbName}?auth=${userId}`;
+  db.connectionURL = connectionURL;
 
   await sendCommand({
     action: "updateOne",
@@ -90,14 +120,21 @@ async function connectDatabase(req, res) {
   if (!db.credentials)
     return res.status(400).json({ error: "Database credentials not set" });
 
+  const connectionURL = db.connectionURL || buildConnectionURL({
+    username: db.credentials.username,
+    password: db.credentials.password,
+    dbName,
+    userId
+  });
+
   const ydp = require("your-data-patner");
-  const conn = ydp.connect(db.connectionURL);
+  const conn = ydp.connect(connectionURL);
 
   new ydp.model(schemaName, new ydp.Schema({}), conn);
 
   return res.json({
     message: "Connected to DB Successfully",
-    connectionURL: db.connectionURL,
+    connectionURL,
     usage: {
       insert: `conn.insert("${schemaName}", {name:'User'})`,
       read:   `conn.read("${schemaName}")`,
@@ -155,13 +192,63 @@ async function addSchema(req, res) {
 --------------------------------------------------------- */
 async function listUserDatabases(req, res) {
   const { userId } = req.params;
+  try {
+    const [engineRes, userRes] = await Promise.all([
+      sendCommand({ action: "listDatabases", userId }),
+      sendCommand({
+        action: "find",
+        dbName: "system",
+        collection: "users",
+        filter: { id: userId }
+      })
+    ]);
 
-  const engineRes = await sendCommand({
-    action: "listDatabases",
-    userId
-  });
+    const engineDbs = normalizeEngineDatabases(engineRes);
+    const user = Array.isArray(userRes) ? userRes[0] : null;
+    const userDbMap = new Map(
+      (user?.databases || []).map(db => [db.name, db])
+    );
 
-  res.json(engineRes);
+    const merged = engineDbs.map(db => {
+      const dbName = db.name;
+      const meta = userDbMap.get(dbName) || {};
+      const creds = meta.credentials;
+      const connectionURL = creds
+        ? buildConnectionURL({
+            username: creds.username,
+            password: creds.password,
+            dbName,
+            userId
+          })
+        : meta.connectionURL || null;
+
+      return {
+        ...db,
+        name: dbName,
+        connectionURL,
+        credentialsSet: Boolean(creds),
+        token: creds?.token || meta.token || null
+      };
+    });
+
+    const orphanedUserDbs = [...userDbMap.values()]
+      .filter(db => !engineDbs.find(edb => edb.name === db.name))
+      .map(db => ({
+        name: db.name,
+        connectionURL: db.connectionURL || null,
+        credentialsSet: Boolean(db.credentials),
+        token: db.credentials?.token || null,
+        status: "not-found-in-engine"
+      }));
+
+    return res.json({
+      databases: [...merged, ...orphanedUserDbs],
+      total: merged.length + orphanedUserDbs.length
+    });
+  } catch (err) {
+    console.error("[listUserDatabases] error", err);
+    return res.status(500).json({ error: "Failed to list databases" });
+  }
 }
 
 /* ---------------------------------------------------------
@@ -170,15 +257,17 @@ async function listUserDatabases(req, res) {
 async function addData(req, res) {
   const { userId, dbName, schemaName } = req.params;
 
+  const payload = Object.assign({}, req.body);
+  if (!payload.id) payload.id = String(Date.now());
+
   const engineRes = await sendCommand({
     action: "insert",
     userId,
     dbName,
     collection: schemaName,
-    data: req.body
+    data: payload
   });
-
-  res.json(engineRes);
+  res.json({ ...engineRes, insertedId: payload.id });
 }
 
 /* ---------------------------------------------------------
@@ -192,7 +281,7 @@ async function updateData(req, res) {
     userId,
     dbName,
     collection: schemaName,
-    filter: { id: Number(dataId) },
+    filter: { id: String(dataId) },
     update: req.body
   });
 
@@ -210,7 +299,7 @@ async function deleteData(req, res) {
     userId,
     dbName,
     collection: schemaName,
-    filter: { id: Number(dataId) }
+    filter: { id: String(dataId) }
   });
 
   res.json(engineRes);

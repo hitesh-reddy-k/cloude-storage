@@ -4,6 +4,7 @@ const net = require("net");
 
 const userRoutes = require("./router/userrouter");
 const databaseRoutes = require("./router/databaseRoutes");
+const publicRoutes = require("./router/publicRoutes");
 
 dotenv.config();
 
@@ -47,6 +48,7 @@ app.get("/", (req, res) => {
 
 app.use("/user", userRoutes);
 app.use("/database", databaseRoutes);
+app.use("/public", publicRoutes);
 
 // ---------------------------
 // SERVER START

@@ -17,6 +17,8 @@ const {
   connectDatabase
 } = require("../controller/databasecontroller");
 
+const { insertViaPublicURL } = require("../controller/publicController");
+
 router.post("/:userId/create-db",verifyToken,askDatabasePermission);
 
 router.post("/:userId/:dbName/set-credentials", verifyToken, setupDatabaseCredentials);
@@ -26,6 +28,9 @@ router.post("/:userId/:dbName/create-schema",verifyToken,addSchema);
 router.get("/:userId/databases",verifyToken,listUserDatabases);
 
 router.get("/connect/:userId/:dbName/:schemaName", connectDatabase);
+
+// Public HTTP insert endpoint (no auth) — expects body: { connectionURL, schemaName, data }
+router.post("/public/insert", insertViaPublicURL);
 
 
 router.post("/:userId/:dbName/:schemaName/insert", verifyToken, async (req, res) => {

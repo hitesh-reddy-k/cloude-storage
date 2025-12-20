@@ -45,4 +45,10 @@ public:
     // start/stop background maintenance thread
     static void startBackgroundTasks();
     static void stopBackgroundTasks();
+
+    // delete helper: write a tombstone entry for an id and log a DELETE in collection WAL
+    static void del(const std::string& userId,
+                    const std::string& dbName,
+                    const std::string& collection,
+                    const std::string& id);
 };

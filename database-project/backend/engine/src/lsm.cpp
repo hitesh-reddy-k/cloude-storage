@@ -193,20 +193,80 @@ void LSM::updateColumnIndexes(const std::string& userId, const std::string& dbNa
         // scan memtable entries for this collection
         if (memtables.find(key) == memtables.end()) return;
         for (auto& [id, j] : memtables[key]) {
+            // handle tombstone: remove id from all index files
+            if (j.contains("_deleted") && j["_deleted"].is_boolean() && j["_deleted"].get<bool>()) {
+                // load all index files and remove id occurrences
+                for (auto& idxEntry : fs::directory_iterator(idxDir)) {
+                    if (!fs::exists(idxEntry.path())) continue;
+                    try {
+                        json idx; std::ifstream in(idxEntry.path().string()); in >> idx; in.close();
+                        bool changed = false;
+                        for (auto it = idx.begin(); it != idx.end(); ++it) {
+                            auto& arr = it.value();
+                            if (!arr.is_array()) continue;
+                            // remove id from array
+                            json newArr = json::array();
+                            for (auto& v : arr) if (v.get<std::string>() != id) newArr.push_back(v);
+                            if (newArr.size() != arr.size()) { it.value() = newArr; changed = true; }
+                        }
+                        if (changed) { std::ofstream out(idxEntry.path().string(), std::ios::trunc); out << idx.dump(); out.close(); }
+                    } catch (...) {}
+                }
+                continue;
+            }
+
             for (auto& [k, v] : j.items()) {
-                if (k == "id") continue;
+                if (k == "id" || k == "_deleted") continue;
                 fs::path idxFile = idxDir / (k + ".json");
                 json idx;
                 if (fs::exists(idxFile)) {
                     std::ifstream in(idxFile.string()); in >> idx; in.close();
                 }
                 std::string sval = v.is_string() ? v.get<std::string>() : v.dump();
-                idx[sval].push_back(id);
+                // ensure no duplicate id entries
+                auto& arr = idx[sval];
+                if (!arr.is_array()) arr = json::array();
+                bool already = false;
+                for (auto& itv : arr) if (itv.get<std::string>() == id) { already = true; break; }
+                if (!already) arr.push_back(id);
                 std::ofstream out(idxFile.string(), std::ios::trunc);
                 out << idx.dump(); out.close();
             }
         }
     } catch (...) {}
+}
+
+void LSM::del(const std::string& userId, const std::string& dbName, const std::string& collection, const std::string& id) {
+    std::lock_guard<std::mutex> lk(lsm_mutex);
+    std::string key = colKey(userId, dbName, collection);
+
+    // ensure directory
+    fs::path dir = fs::path(LSM_ROOT) / userId / dbName / (collection + ".lsm");
+    fs::create_directories(dir);
+
+    // write DELETE to collection WAL
+    std::string walFile = (fs::path(LSM_ROOT) / userId / dbName / "wal" / (collection + ".wal")).string();
+    json walEntry = {
+        {"op","DELETE"},
+        {"userId", userId},
+        {"db", dbName},
+        {"collection", collection},
+        {"id", id}
+    };
+    WAL::log(walFile, walEntry);
+
+    // insert tombstone into memtable
+    json tomb = { {"id", id}, {"_deleted", true} };
+    memtables[key][id] = tomb;
+    std::cout << "[LSM][DEL] " << key << " / id=" << id << "\n";
+
+    // update column indexes to remove id
+    try { updateColumnIndexes(userId, dbName, collection, json::object()); } catch (...) {}
+
+    if (memtables[key].size() >= MEMTABLE_LIMIT) {
+        std::cout << "[LSM] memtable threshold reached, flushing..." << std::endl;
+        LSM::flush(userId, dbName, collection);
+    }
 }
 
 // ---------------- BACKGROUND TASKS ----------------
