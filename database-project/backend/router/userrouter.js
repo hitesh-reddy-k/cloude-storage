@@ -13,10 +13,6 @@ router.post("/logout/:userId",logoutUser)
 router.post("/verify-mfa/:userId",verifyMFA);
 
 
-
-
-
-
 router.get("/user", verifyToken, (req, res) => {
   res.json({ message: `Hello ${req.user.username}` });
 });
