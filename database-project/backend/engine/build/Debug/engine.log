@@ -1,0 +1,100 @@
+[MAIN] Starting DB Engine...
+[ENGINE] Data root initialized: "C:\\Users\\hites\\Desktop\\database-project\\data\\"
+[LSM] Initialized at: C:/Users/hites/Desktop/database-project/data/
+[LSM] Background maintenance started
+[SERVER] Listening on port 9000...
+[SERVER] Received: {"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684941_0","name":"BulkUser_0","email":"bulk0@example.com","createdAt":"2025-12-23T16:34:44.941Z"}}
+[SERVER] Received: {"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684943_1","name":"BulkUser_1","email":"bulk1@example.com","createdAt":"2025-12-23T16:34:44.943Z"}}
+[SERVER] Received: {"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684943_6","name":"BulkUser_6","email":"bulk6@example.com","createdAt":"2025-12-23T16:34:44.943Z"}}[SERVER] Received: 
+[SERVER] Action = [SERVER] Received: insert{"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684943_4","name":"BulkUser_4","email":"bulk4@example.com","createdAt":"2025-12-23T16:34:44.943Z"}}
+{"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684943_2","name":"BulkUser_2","email":"bulk2@example.com","createdAt":"2025-12-23T16:34:44.943Z"}}[SERVER] Received: 
+[SERVER] Received: [SERVER] Received: {"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684944_11","name":"BulkUser_11","email":"bulk11@example.com","createdAt":"2025-12-23T16:34:44.944Z"}}{"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684943_7","name":"BulkUser_7","email":"bulk7@example.com","createdAt":"2025-12-23T16:34:44.943Z"}}
+
+[SERVER] Received: [SERVER] Received: {"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684944_14","name":"BulkUser_14","email":"bulk14@example.com","createdAt":"2025-12-23T16:34:44.944Z"}}
+[SERVER] Received: {"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684944_16","name":"BulkUser_16","email":"bulk16@example.com","createdAt":"2025-12-23T16:34:44.944Z"}}
+[SERVER] Action = insert[SERVER] Received: 
+[SERVER] Received: {"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684944_10","name":"BulkUser_10","email":"bulk10@example.com","createdAt":"2025-12-23T16:34:44.944Z"}}
+[SERVER] Received: {"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684943_8","name":"BulkUser_8","email":"bulk8@example.com","createdAt":"2025-12-23T16:34:44.943Z"}}
+[SERVER] Action = insert{"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684944_13","name":"BulkUser_13","email":"bulk13@example.com","createdAt":"2025-12-23T16:34:44.944Z"}}
+[SERVER] Action = insert
+[SERVER] Action = insert[SERVER] Received: 
+[SERVER] Received: {"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684944_17","name":"BulkUser_17","email":"bulk17@example.com","createdAt":"2025-12-23T16:34:44.944Z"}}
+[SERVER] Action = insert
+[ENGINE] Using LSM::put for insert
+{"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684944_9","name":"BulkUser_9","email":"bulk9@example.com","createdAt":"2025-12-23T16:34:44.944Z"}}
+
+[SERVER] Received: {"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684944_12","name":"BulkUser_12","email":"bulk12@example.com","createdAt":"2025-12-23T16:34:44.944Z"}}[SERVER] Action = 
+[SERVER] Received: {"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684943_5","name":"BulkUser_5","email":"bulk5@example.com","createdAt":"2025-12-23T16:34:44.943Z"}}[SERVER] Action = 
+[ENGINE] Using LSM::put for insert
+{"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684943_3","name":"BulkUser_3","email":"bulk3@example.com","createdAt":"2025-12-23T16:34:44.943Z"}}
+[ENGINE] Using LSM::put for insert
+[SERVER] Received: [ENGINE] Using LSM::put for insert
+{"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684944_18","name":"BulkUser_18","email":"bulk18@example.com","createdAt":"2025-12-23T16:34:44.944Z"}}
+[SERVER] Action = insert
+[ENGINE] Using LSM::put for insert
+[ENGINE] Using LSM::put for insert
+[SERVER] Action = insert
+
+insert
+[SERVER] Action = insert{"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684944_15","name":"BulkUser_15","email":"bulk15@example.com","createdAt":"2025-12-23T16:34:44.944Z"}}
+[LSM][PUT] loadtest/load-db/user-db / id=1766507684941_0
+[SERVER] Received: {"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684944_19","name":"BulkUser_19","email":"bulk19@example.com","createdAt":"2025-12-23T16:34:44.944Z"}}
+[SERVER] Action = insert[SERVER] Action = 
+[ENGINE] Using LSM::put for insert
+[SERVER] Action = insert
+[SERVER] Action = insert
+
+[ENGINE] Using LSM::put for insert
+[SERVER] Action = [ENGINE] Using LSM::put for insert
+insert
+insert
+[ENGINE] Using LSM::put for insert
+[ENGINE] Using LSM::put for insert
+[SERVER] Action = insert[ENGINE] Using LSM::put for insert
+
+[ENGINE] Using LSM::put for insert
+insert[SERVER] Action = 
+insert[ENGINE] Using LSM::put for insert
+[SERVER] Action = insert[ENGINE] Using LSM::put for insert
+
+[SERVER] Action = [ENGINE] Using LSM::put for insert
+insert
+
+[LSM][PUT] [ENGINE] Using LSM::put for insert
+loadtest/load-db/user-db / id=1766507684943_2
+[ENGINE] Using LSM::put for insert
+[ENGINE] Using LSM::put for insert
+[ENGINE] Using LSM::put for insert
+[LSM][PUT] loadtest/load-db/user-db / id=1766507684944_15
+[SERVER] Received: {"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684944_20","name":"BulkUser_20","email":"bulk20@example.com","createdAt":"2025-12-23T16:34:44.944Z"}}
+[SERVER] Action = insert
+[ENGINE] Using LSM::put for insert
+[SERVER] Received: {"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684944_21","name":"BulkUser_21","email":"bulk21@example.com","createdAt":"2025-12-23T16:34:44.944Z"}}
+[LSM][PUT] loadtest/load-db/user-db / id=1766507684943_4
+[SERVER] Action = insert
+[ENGINE] Using LSM::put for insert
+[SERVER] Received: {"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684944_22","name":"BulkUser_22","email":"bulk22@example.com","createdAt":"2025-12-23T16:34:44.944Z"}}
+[LSM][PUT] loadtest/load-db/user-db / id=1766507684944_14
+[SERVER] Action = insert
+[SERVER] Received: [ENGINE] Using LSM::put for insert
+{"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684944_23","name":"BulkUser_23","email":"bulk23@example.com","createdAt":"2025-12-23T16:34:44.944Z"}}
+[SERVER] Action = insert
+[SERVER] Received: {"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684944_24","name":"BulkUser_24","email":"bulk24@example.com","createdAt":"2025-12-23T16:34:44.944Z"}}
+[LSM][PUT] loadtest/load-db/user-db / id=1766507684943_1
+[ENGINE] Using LSM::put for insert
+[SERVER] Action = insert
+[ENGINE] Using LSM::put for insert
+[SERVER] Received: {"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684944_25","name":"BulkUser_25","email":"bulk25@example.com","createdAt":"2025-12-23T16:34:44.944Z"}}
+[SERVER] Action = insert
+[LSM][PUT] loadtest/load-db/user-db / id=1766507684944_17
+[ENGINE] Using LSM::put for insert
+[LSM][PUT] loadtest/load-db/user-db / id=1766507684943_8
+[LSM] memtable threshold reached, flushing...
+[SERVER] Received: {"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684944_26","name":"BulkUser_26","email":"bulk26@example.com","createdAt":"2025-12-23T16:34:44.944Z"}}
+[SERVER] Action = insert
+[ENGINE] Using LSM::put for insert
+[SERVER] Received: {"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684944_27","name":"BulkUser_27","email":"bulk27@example.com","createdAt":"2025-12-23T16:34:44.944Z"}}
+[SERVER] Action = insert
+[ENGINE] Using LSM::put for insert
+[SERVER] Received: {"action":"insert","userId":"loadtest","dbName":"load-db","collection":"user-db","data":{"id":"1766507684944_28","name":"BulkUser_28","email":"bulk28@example.com","createdAt":"2025-12-23T16:34:44.944Z"}}
+[SERVER] Action = insert
