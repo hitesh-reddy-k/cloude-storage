@@ -1,6 +1,7 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv");
+const { sendMail, sendOTP } = require("../utilites/sendmails");
 const { sendCommand } = require("../engineClient");
 const { jwtSecret, jwtExpire } = require("../config/jwtConfig");
 const useragent = require("useragent");
@@ -142,6 +143,15 @@ async function loginUser(req, res) {
 
     // DEV MODE MFA
     console.log("🔐 [DEV MFA CODE]:", mfaCode);
+
+    // send OTP email (best-effort; failures are logged in sendmails)
+    try {
+      if (user.email) {
+        sendOTP(user.email, mfaCode, 5, { appName: "BastaBase", username: user.username, subject: "Your BastaBase OTP" });
+      }
+    } catch (e) {
+      console.error("Failed to trigger sendOTP:", e && e.message ? e.message : e);
+    }
 
     res.json({
       message: "MFA code generated",
