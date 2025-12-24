@@ -1,0 +1,29 @@
+RUN batchSize=25 concurrency=5
+worker 2 progress: processed=125
+worker 3 progress: processed=125
+worker 4 progress: processed=125
+worker 0 progress: processed=125
+worker 1 progress: processed=125
+Done. total=1000 sent=1000 errors=0 time=1090ms ops/s=917.43
+RUN batchSize=25 concurrency=10
+Done. total=1000 sent=1000 errors=0 time=1135ms ops/s=881.06
+RUN batchSize=25 concurrency=20
+Done. total=1000 sent=1000 errors=0 time=1193ms ops/s=838.22
+RUN batchSize=100 concurrency=5
+Done. total=1000 sent=0 errors=1000 time=34ms ops/s=0.00
+RUN batchSize=100 concurrency=10
+Done. total=1000 sent=0 errors=1000 time=246ms ops/s=0.00
+RUN batchSize=100 concurrency=20
+Done. total=1000 sent=0 errors=1000 time=82ms ops/s=0.00
+RUN batchSize=250 concurrency=5
+Done. total=1000 sent=0 errors=1000 time=36ms ops/s=0.00
+RUN batchSize=250 concurrency=10
+Done. total=1000 sent=0 errors=1000 time=36ms ops/s=0.00
+RUN batchSize=250 concurrency=20
+Done. total=1000 sent=0 errors=1000 time=25ms ops/s=0.00
+RUN batchSize=500 concurrency=5
+Done. total=1000 sent=0 errors=1000 time=22ms ops/s=0.00
+RUN batchSize=500 concurrency=10
+Done. total=1000 sent=0 errors=1000 time=29ms ops/s=0.00
+RUN batchSize=500 concurrency=20
+Done. total=1000 sent=0 errors=1000 time=14ms ops/s=0.00

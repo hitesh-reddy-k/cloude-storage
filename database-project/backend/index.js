@@ -65,6 +65,7 @@ async function startServer() {
     });
 
   } catch (err) {
+
     console.error("❌ Database Engine not running");
     console.error("➡️ Start C++ engine first on port 9000");
     process.exit(1);

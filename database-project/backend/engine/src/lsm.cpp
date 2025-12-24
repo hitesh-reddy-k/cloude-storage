@@ -18,7 +18,14 @@ static std::mutex lsm_mutex;
 // memtable keyed by collectionPath -> map<id,json>
 static std::unordered_map<std::string, std::unordered_map<std::string, json>> memtables;
 static std::string LSM_ROOT;
-static const size_t MEMTABLE_LIMIT = 8; // small for testing
+// memtable limit: default 1024 entries, can be overridden with env LSM_MEMTABLE_LIMIT
+static size_t MEMTABLE_LIMIT = []() {
+    const char* v = std::getenv("LSM_MEMTABLE_LIMIT");
+    if (v) {
+        try { return static_cast<size_t>(std::stoul(v)); } catch (...) { }
+    }
+    return static_cast<size_t>(1024);
+}();
 static const size_t COMPACTION_THRESHOLD = 2; // number of SSTs to compact
 static std::atomic<bool> bgRunning(false);
 

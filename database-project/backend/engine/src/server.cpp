@@ -135,6 +135,35 @@ void handleClient(unsigned long long clientSocket) {
             res["status"] = ok ? "deleted" : "not_found";
         }
 
+        // ---------------- BULK ----------------
+        else if (action == "bulk") {
+            // expect: { action: 'bulk', ops: [ { action: 'insert', ... }, { action: 'deleteOne', ... } ] }
+            auto ops = req.value("ops", json::array());
+            int inserted = 0, updated = 0, deleted_count = 0, errors = 0;
+
+            for (auto &op : ops) {
+                try {
+                    std::string a = op.value("action", "");
+                    if (a == "insert") {
+                        DatabaseEngine::insert(op.value("userId", "system"), op["dbName"], op["collection"], op["data"]);
+                        inserted++;
+                    } else if (a == "updateOne") {
+                        bool ok2 = DatabaseEngine::updateOne(op.value("userId", "system"), op["dbName"], op["collection"], op["filter"], op["update"]);
+                        if (ok2) updated++; else errors++;
+                    } else if (a == "deleteOne") {
+                        bool ok3 = DatabaseEngine::deleteOne(op.value("userId", "system"), op["dbName"], op["collection"], op["filter"]);
+                        if (ok3) deleted_count++; else errors++;
+                    } else {
+                        errors++;
+                    }
+                } catch (...) {
+                    errors++;
+                }
+            }
+
+            res = { {"status", "ok"}, {"inserted", inserted}, {"updated", updated}, {"deleted", deleted_count}, {"errors", errors} };
+        }
+
         // ---------------- UNKNOWN ----------------
         else {
             res = {
