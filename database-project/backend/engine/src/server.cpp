@@ -90,6 +90,17 @@ void handleClient(unsigned long long clientSocket) {
             res = { {"status", "inserted"} };
         }
 
+        // ---------------- INSERT VECTOR ----------------
+        else if (action == "insertVector") {
+            DatabaseEngine::insertVector(
+                req.value("userId", "system"),
+                req["dbName"],
+                req["collection"],
+                req["data"]
+            );
+            res = { {"status", "inserted"} };
+        }
+
         // ---------------- FIND ----------------
         else if (action == "find") {
             std::cout << "[SERVER] Dispatching FIND\n";
@@ -104,6 +115,20 @@ void handleClient(unsigned long long clientSocket) {
             res["status"] = "ok";
             res["count"]  = results.size();
             res["data"]   = results;
+        }
+
+        // ---------------- VECTOR QUERY ----------------
+        else if (action == "queryVector") {
+            std::cout << "[SERVER] Dispatching VECTOR QUERY\n";
+            auto results = DatabaseEngine::queryVector(
+                req.value("userId", "system"),
+                req["dbName"],
+                req["collection"],
+                req
+            );
+            res["status"] = "ok";
+            res["count"] = results.size();
+            res["data"] = results;
         }
 
         // ---------------- UPDATE ONE ----------------

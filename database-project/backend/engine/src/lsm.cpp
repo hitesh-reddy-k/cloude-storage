@@ -10,6 +10,7 @@
 #include <functional>
 #include <unordered_set>
 #include <atomic>
+#include <cstdlib>
 
 namespace fs = std::filesystem;
 
@@ -51,6 +52,7 @@ void LSM::put(const std::string& userId, const std::string& dbName, const std::s
     // ensure directory
     fs::path dir = fs::path(LSM_ROOT) / userId / dbName / (collection + ".lsm");
     fs::create_directories(dir);
+    fs::create_directories(fs::path(LSM_ROOT) / userId / dbName / "wal");
 
     // WAL entry
     json walEntry = {

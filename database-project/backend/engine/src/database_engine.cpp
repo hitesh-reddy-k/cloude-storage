@@ -15,6 +15,33 @@ using json = nlohmann::json;
 
 static std::string DATA_ROOT;
 
+static double dotProduct(const std::vector<double>& a, const std::vector<double>& b) {
+    double s = 0.0; size_t n = std::min(a.size(), b.size());
+    for (size_t i = 0; i < n; ++i) s += a[i] * b[i];
+    return s;
+}
+
+static double l2(const std::vector<double>& a, const std::vector<double>& b) {
+    double s = 0.0; size_t n = std::min(a.size(), b.size());
+    for (size_t i = 0; i < n; ++i) {
+        double d = a[i] - b[i]; s += d * d;
+    }
+    return std::sqrt(s);
+}
+
+static std::vector<double> jsonToVector(const json& jvec) {
+    std::vector<double> v;
+    if (!jvec.is_array()) return v;
+    v.reserve(jvec.size());
+    for (auto& x : jvec) {
+        if (x.is_number()) v.push_back(x.get<double>());
+        else if (x.is_string()) {
+            try { v.push_back(std::stod(x.get<std::string>())); } catch (...) {}
+        }
+    }
+    return v;
+}
+
 /* ---------------- INIT ---------------- */
 void DatabaseEngine::init(const std::string& rootPath) {
     DATA_ROOT = rootPath;
@@ -113,6 +140,22 @@ void DatabaseEngine::insert(const std::string& userId,
     LSM::put(userId, dbName, collection, doc);
 }
 
+/* ---------------- INSERT VECTOR ---------------- */
+void DatabaseEngine::insertVector(const std::string& userId,
+                                  const std::string& dbName,
+                                  const std::string& collection,
+                                  const json& doc) {
+    // Expect doc to contain: id, vector (array), modality (optional), metadata (optional)
+    if (!doc.contains("vector")) {
+        std::cerr << "[ENGINE][INSERT VECTOR] missing vector field" << std::endl;
+        return;
+    }
+    json toStore = doc;
+    toStore["kind"] = "vector";
+    // reuse LSM path
+    LSM::put(userId, dbName, collection, toStore);
+}
+
 /* ---------------- FIND ---------------- */
 std::vector<json> DatabaseEngine::find(const std::string& userId,
                                        const std::string& dbName,
@@ -144,6 +187,54 @@ std::vector<json> DatabaseEngine::find(const std::string& userId,
               << " / " << docs.size() << "\n";
 
     return matches;
+}
+
+/* ---------------- VECTOR QUERY ---------------- */
+std::vector<json> DatabaseEngine::queryVector(const std::string& userId,
+                                              const std::string& dbName,
+                                              const std::string& collection,
+                                              const json& query) {
+    // query: { vector: [...], k: int, metric: "cosine"|"l2", filter: {...}, modality?: string }
+    auto docs = LSM::getAll(userId, dbName, collection);
+    std::vector<double> q = jsonToVector(query.value("vector", json::array()));
+    int k = query.value("k", 10);
+    std::string metric = query.value("metric", std::string("cosine"));
+    json filter = query.value("filter", json::object());
+    std::string modality = query.value("modality", std::string(""));
+
+    struct Scored { double score; json doc; };
+    std::vector<Scored> scored;
+    scored.reserve(docs.size());
+
+    for (auto& d : docs) {
+        if (d.contains("_deleted") && d["_deleted"].is_boolean() && d["_deleted"].get<bool>()) continue;
+        if (!d.contains("vector")) continue;
+        if (!modality.empty() && d.value("modality", std::string("")) != modality) continue;
+        if (!match(d, filter)) continue;
+        auto v = jsonToVector(d["vector"]);
+        if (v.empty() || q.empty()) continue;
+        double score = 0.0;
+        if (metric == "l2") {
+            score = -l2(q, v); // negative distance so higher is better
+        } else {
+            score = dotProduct(q, v);
+        }
+        scored.push_back({score, d});
+    }
+
+    // partial sort top-k
+    if (k < 1) k = 10;
+    if (k > (int)scored.size()) k = (int)scored.size();
+    std::nth_element(scored.begin(), scored.begin() + k, scored.end(), [](const Scored&a,const Scored&b){return a.score>b.score;});
+    std::sort(scored.begin(), scored.begin() + k, [](const Scored&a,const Scored&b){return a.score>b.score;});
+
+    std::vector<json> out; out.reserve(k);
+    for (int i = 0; i < k; ++i) {
+        json r = scored[i].doc;
+        r["score"] = scored[i].score;
+        out.push_back(r);
+    }
+    return out;
 }
 
 /* ---------------- UPDATE ---------------- */
